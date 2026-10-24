@@ -179,7 +179,7 @@ Org affiliated keyword（本包自己的约定），不依赖任何外部包。
 ** heading 默认包含标题行
 
 =org-quote-link-include-headline= 默认 =t= ：插入 =* 标题= 这一行和整个子树。
-因为 heading 行和 =#+= 关键字在 quote-block 里会被重新解析（未转义的 =* 会
+因为 heading 行和 =#+= 关键字在 quote-block 里会被重新解析（未转义的 =*= 会
 直接截断 quote-block），所以插入前会用 =org-escape-code-in-region= 转义：
 行首的 =*= 、 =#+= 前面加逗号，得到 =,* 标题= 、 =,#+begin_src= ……
 
