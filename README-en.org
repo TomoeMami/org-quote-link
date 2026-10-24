@@ -30,20 +30,107 @@ After running the command:
 Requirements: Emacs 27.1 and Org 9.3. The package depends on Org only; it
 does not need, load, or call org-transclusion or org-transclusion-blocks.
 
+** TomoElpa (recommended)
+
+[[https://blog.prayhand13013.top/tomoelpa/][TomoElpa]] is the recommended way to install
+org-quote-link. It provides both snapshots built from the latest commit and
+versioned releases. The archive paths have no browsable directory index; see
+the TomoElpa page for the package list — the URLs below are what
+=package.el= reads. Add the snapshots archive to =package-archives= and
+refresh the package index, then let =use-package= install and configure the
+package (Emacs 29 and later bundle =use-package= natively; Emacs 27–28 need
+it from GNU ELPA first):
+
 #+begin_src emacs-lisp
+  (require 'package)
+  (add-to-list 'package-archives
+               '("tomoelpa-snapshots" .
+                 "https://blog.prayhand13013.top/tomoelpa/snapshots/") t)
+  (package-initialize)
+  (package-refresh-contents)  ; once, or after the archive is updated
+
+  (require 'use-package)
+
   (use-package org-quote-link
-    :ensure nil                     ; not on ELPA
-    :load-path "/path/to/org-quote-link"
+    :ensure t
+    :pin tomoelpa-snapshots
     :bind (("C-c q" . org-quote-link)
            :map org-mode-map
            ("C-c Q" . org-quote-link-refresh)))
 #+end_src
 
-You can also install it without =use-package= by adding:
+To use versioned releases instead of snapshots, switch the archive to
+=tomoelpa-releases= and update =:pin= accordingly:
+
+#+begin_src emacs-lisp
+  (add-to-list 'package-archives
+               '("tomoelpa-releases" .
+                 "https://blog.prayhand13013.top/tomoelpa/releases/") t)
+  (package-refresh-contents)
+
+  (use-package org-quote-link
+    :ensure t
+    :pin tomoelpa-releases
+    :bind (("C-c q" . org-quote-link)
+           :map org-mode-map
+           ("C-c Q" . org-quote-link-refresh)))
+#+end_src
+
+If you do not use =use-package= you can run
+=M-x package-install RET org-quote-link RET= once.
+
+** The =:vc= keyword of use-package
+
+On Emacs 30.1 and later, the =:vc= keyword of =use-package= can install the
+package straight from GitHub, without a package archive:
+
+#+begin_src emacs-lisp
+  (use-package org-quote-link
+    :vc (:url "https://github.com/TomoeMami/org-quote-link" :rev :newest)
+    :bind (("C-c q" . org-quote-link)
+           :map org-mode-map
+           ("C-c Q" . org-quote-link-refresh)))
+#+end_src
+
+=:rev :newest= checks out the latest commit. If =:rev= is omitted, =:vc=
+tries the latest release; this repository has no release tags, so keep
+=:rev :newest= and make sure =git= and network access are available. To
+update later, run =M-x package-vc-upgrade RET org-quote-link RET= and it
+will update the package.
+
+On older Emacs versions use TomoElpa or =straight.el= instead.
+
+** straight.el
+
+#+begin_src emacs-lisp
+  (straight-use-package
+   '(org-quote-link :type git :host github :repo "TomoeMami/org-quote-link"))
+#+end_src
+
+With =use-package= it looks like this:
+
+#+begin_src emacs-lisp
+  (use-package org-quote-link
+    :straight (:type git :host github :repo "TomoeMami/org-quote-link")
+    :bind (("C-c q" . org-quote-link)
+           :map org-mode-map
+           ("C-c Q" . org-quote-link-refresh)))
+#+end_src
+
+** Manual installation
+
+Clone the repository and add the directory to =load-path= first:
 
 #+begin_src emacs-lisp
   (add-to-list 'load-path "/path/to/org-quote-link")
   (require 'org-quote-link)
+#+end_src
+
+Then bind the commands as needed:
+
+#+begin_src emacs-lisp
+  (define-key org-mode-map (kbd "C-c q") #'org-quote-link)
+  (define-key org-mode-map (kbd "C-c Q") #'org-quote-link-refresh)
 #+end_src
 
 * Usage
