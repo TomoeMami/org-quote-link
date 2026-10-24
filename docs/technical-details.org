@@ -66,10 +66,17 @@ CUSTOM_ID、target、 =#+name:= 、行/区域文字搜索、整个文件），�
 下面这些不是 =org-store-link= 的输出，默认会被拒绝（报 =user-error= ，不会改
 动 buffer）：
 
-- fringe 链接： =[[标题]]= 、 =[[*标题]]= ；
+- fuzzy 链接： =[[标题]]= 、 =[[*标题]]= ；
 - 手写 custom-id 链接： =[[#custom-id]]= ；
 - 普通 URL： =[[https://example.com]]= ；
 - 其它没有 =:store= 的第三方类型。
+
+这里要和 =file:= 链接里的 =::文本= 搜索区分开：fuzzy 链接没有显式的类型和
+文件路径，只能按 Org 的启发式规则在当前 buffer 里搜索（可能匹配标题、命名
+元素、target 或正文，甚至弹出“创建标题”的询问），而且 =org-store-link= 通常
+不会生成它；而 =file:= 链接则带有明确的文件和搜索串，可以跨文件、结果更确定，
+=org-store-link= 会生成这种形式。其中 =[[*标题]]= 只是 fuzzy 搜索的一种写法（强制
+按标题搜索），链接类型仍然是 fuzzy。
 
 要支持它们，加一个 handler，见下一节。
 
