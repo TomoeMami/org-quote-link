@@ -663,5 +663,94 @@ The link uses the file name relative to DIR."
                       "[[file:target.org::*H]]" "body\n")))
       (should-not (string-match-p (regexp-quote "SCHEDULED") result)))))
 
+
+;;;; Unified `org-quote-link' command (dispatch on point)
+
+(ert-deftest org-quote-link-test-dispatch-converts-link ()
+  "On a link, `org-quote-link' converts it."
+  (org-quote-link-test--with-dir
+    (org-quote-link-test--write dir "target.org" "* H\nbody\n")
+    (org-quote-link-test--write dir "main.org" "[[file:target.org::*H]]\n")
+    (let ((buffer (org-quote-link-test--visit dir "main.org")))
+      (with-current-buffer buffer
+        (goto-char (point-min))
+        (search-forward "[[file:")
+        (goto-char (match-beginning 0))
+        (org-quote-link)
+        (should (equal (buffer-string)
+                       (org-quote-link-test--block
+                        "[[file:target.org::*H]]" ",* H\nbody\n")))))))
+
+(ert-deftest org-quote-link-test-dispatch-refreshes-block ()
+  "Inside an org-quote-link block, `org-quote-link' refreshes it."
+  (org-quote-link-test--with-dir
+    (org-quote-link-test--write dir "target.org" "* H\nold body\n")
+    (org-quote-link-test--write dir "main.org" "[[file:target.org::*H]]\n")
+    (let ((buffer (org-quote-link-test--visit dir "main.org"))
+          (target-buffer (org-quote-link-test--visit dir "target.org")))
+      (with-current-buffer buffer
+        (goto-char (point-min))
+        (search-forward "[[file:")
+        (goto-char (match-beginning 0))
+        (org-quote-link))
+      (with-current-buffer target-buffer
+        (erase-buffer)
+        (insert "* H\nnew body\n"))
+      ;; Point inside the block body.
+      (with-current-buffer buffer
+        (goto-char (point-min))
+        (search-forward "old body")
+        (org-quote-link)
+        (should (string-match-p (regexp-quote ",* H\nnew body\n")
+                                (buffer-string)))
+        (should-not (string-match-p (regexp-quote "old body")
+                                    (buffer-string)))
+        ;; Point on the #+HEADER line also refreshes.
+        (goto-char (point-min))
+        (search-forward "#+HEADER")
+        (org-quote-link)
+        (should (string-match-p (regexp-quote ",* H\nnew body\n")
+                                (buffer-string)))))))
+
+(ert-deftest org-quote-link-test-dispatch-refuses-elsewhere ()
+  "`org-quote-link' refuses to act where neither action applies."
+  (org-quote-link-test--with-dir
+    (let* ((content "plain text\n")
+           (buffer (progn
+                     (org-quote-link-test--write dir "main.org" content)
+                     (org-quote-link-test--visit dir "main.org"))))
+      (with-current-buffer buffer
+        (goto-char (point-min))
+        (should-error (org-quote-link) :type 'user-error)
+        (should (equal (buffer-string) content))))))
+
+(ert-deftest org-quote-link-test-explicit-commands-still-work ()
+  "The explicit convert/refresh commands remain usable directly."
+  (org-quote-link-test--with-dir
+    (org-quote-link-test--write dir "target.org" "* H\nbody\n")
+    (org-quote-link-test--write dir "main.org" "[[file:target.org::*H]]\n")
+    (let ((buffer (org-quote-link-test--visit dir "main.org")))
+      (with-current-buffer buffer
+        (goto-char (point-min))
+        (search-forward "[[file:")
+        (goto-char (match-beginning 0))
+        (org-quote-link-at-point)
+        (goto-char (point-min))
+        (search-forward "#+begin_quote")
+        (org-quote-link-refresh)
+        (should (string-match-p (regexp-quote ",* H\nbody\n")
+                                (buffer-string)))))))
+
+
+(ert-deftest org-quote-link-test-dispatch-refuses-non-org-buffer ()
+  "`org-quote-link' in a non-Org buffer gives a clear error."
+  (let ((buffer (find-file-noselect (make-temp-file "org-quote-link-test" nil ".txt"))))
+    (unwind-protect
+        (with-current-buffer buffer
+          (insert "plain text\n")
+          (goto-char (point-min))
+          (should-error (org-quote-link) :type 'user-error))
+      (kill-buffer buffer))))
+
 (provide 'org-quote-link-test)
 ;;; org-quote-link-test.el ends here

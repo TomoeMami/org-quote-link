@@ -31,7 +31,7 @@ org-transclusion 或 org-transclusion-blocks。
   (use-package org-quote-link
     :ensure nil                     ; 本包不在 ELPA 上
     :load-path "/path/to/org-quote-link"
-    :bind (("C-c q" . org-quote-link-at-point)
+    :bind (("C-c q" . org-quote-link)
            :map org-mode-map
            ("C-c Q" . org-quote-link-refresh)))
 #+end_src
@@ -45,7 +45,21 @@ org-transclusion 或 org-transclusion-blocks。
 
 * 使用
 
-** 把链接转换成引用块
+** 推荐入口
+
+只绑定一个命令 =M-x org-quote-link= 就够了。它会根据光标位置自动分派：
+
+| 光标位置                                       | 动作                       |
+|------------------------------------------------+----------------------------|
+| 带 =#+HEADER: :transclude [[LINK]]= 的块内部     | 刷新这个块                 |
+| 单行 Org 链接上                                 | 把链接转换成引用块         |
+| 其它位置                                       | 报 =user-error=，不改 buffer |
+
+分派时优先看“是否在块里”，再看“是否在链接上”；因此块里的链接也会触发刷新。
+
+如果想跳过判断、强制做某个动作，仍然可以直接调用下面两个显式命令。
+
+** 转换链接（显式命令）
 
 光标放在链接上，执行：
 
@@ -65,13 +79,15 @@ org-transclusion 或 org-transclusion-blocks。
 
 完整链接类型表与行为细节见 [[file:docs/technical-details.org][技术细节]]。
 
-** 刷新
+** 刷新（显式命令）
 
 引用块是快照。要重新抓取，把光标放在块里，执行：
 
 #+begin_src emacs-lisp
   M-x org-quote-link-refresh
 #+end_src
+
+（=M-x org-quote-link= 在块里执行时也会做同样的事。）
 
 它只依赖 Org，读取块里的 =#+HEADER: :transclude [[LINK]]= 行重新解析和替换
 正文；光标在 header / begin / 正文 / end 行都可以。

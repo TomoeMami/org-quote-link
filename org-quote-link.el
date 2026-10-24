@@ -3,7 +3,7 @@
 ;; Copyright (C) 2026 Riko
 
 ;; Author: Riko
-;; Version: 0.3.0
+;; Version: 0.4.0
 ;; Package-Requires: ((emacs "27.1") (org "9.3"))
 ;; Keywords: hypermedia, org, outlines
 ;; SPDX-License-Identifier: GPL-3.0-or-later
@@ -100,18 +100,26 @@
 ;;     (add-to-list 'org-quote-link-link-handlers
 ;;                  '("mu4e" . my/quote-mu4e))
 ;;
-;; 刷新：
+;; 统一入口：
 ;;
-;;   用本包自带的 `org-quote-link-refresh'（光标放在块里即可）。它只依赖
-;;   Org，读取块里的 `#+HEADER: :transclude [[LINK]]' 行重新抓取内容。
-;;   如果你另外使用 org-transclusion-blocks，它的 add 命令也可能识别
+;;   `org-quote-link' 是推荐的单命令入口，按光标位置分派：
+;;
+;;     - 在带 `#+HEADER: :transclude [[LINK]]' 的块内 → 刷新该块；
+;;     - 在单行 Org 链接上 → 转换成引用块；
+;;     - 其它位置 → `user-error'，不改 buffer。
+;;
+;;   想强制某个动作时，仍然可以直接用 `org-quote-link-at-point' 和
+;;   `org-quote-link-refresh'。刷新只依赖 Org，读取块里的 header 行重新抓取
+;;   内容；如果你另外使用 org-transclusion-blocks，它的 add 命令也可能识别
 ;;   这个格式（可选互操作，不是本包的依赖）。
 ;;
 ;; 使用方式：
 ;;
 ;;     (use-package org-quote-link
 ;;       :ensure nil
-;;       :bind (("C-c q" . org-quote-link-at-point)))
+;;       :bind (("C-c q" . org-quote-link)
+;;              :map org-mode-map
+;;              ("C-c Q" . org-quote-link-refresh)))
 ;;
 ;; 或者把本文件放到 `load-path' 里 `(require 'org-quote-link)'。
 ;;
@@ -257,6 +265,11 @@ Signal a `user-error' when point is not on a link."
     (cond
      ((eq (org-element-type context) 'link) context)
      (t (user-error "Point is not on an Org link")))))
+
+(defun org-quote-link--link-at-point-p ()
+  "Return non-nil when point is on an Org link in an Org buffer."
+  (and (derived-mode-p 'org-mode)
+       (eq (org-element-type (ignore-errors (org-element-context))) 'link)))
 
 (defun org-quote-link--link-string (link)
   "Return the bracket form of LINK as a string.
@@ -748,7 +761,10 @@ result looks like this:
 
 Only link types that `org-store-link' can produce are accepted by
 default.  See `org-quote-link-link-handlers' for extending this to
-other link types."
+other link types.
+
+See also `org-quote-link' for a single command that picks the
+right action based on the position of point."
   (interactive)
   (let* ((link (org-quote-link--link-at-point))
          (link-string (org-quote-link--link-string link)))
@@ -864,7 +880,10 @@ The value is t, nil, or `:default' when the block does not say."
 The block is recognized by its `#+HEADER: :transclude [[LINK]]'
 line, so blocks created by `org-quote-link-at-point' as well as
 equivalent blocks written by hand can be refreshed.  The content
-is replaced with a fresh, escaped snapshot of the link target."
+is replaced with a fresh, escaped snapshot of the link target.
+
+See also `org-quote-link' for a single command that picks the
+right action based on the position of point."
   (interactive)
   (let* ((block (or (org-quote-link--block-at-point)
                     (user-error "Point is not in a block")))
@@ -888,6 +907,35 @@ is replaced with a fresh, escaped snapshot of the link target."
           (insert content)))
       (message "Refreshed org-quote-link block")
       content)))
+
+;;;###autoload
+(defun org-quote-link ()
+  "Quote the Org link at point, or refresh the quote block at point.
+
+This is the recommended command to bind to a key.  It dispatches on
+the position of point:
+
+- inside a block that has a `#+HEADER: :transclude [[LINK]]' line:
+  refresh that block, like `org-quote-link-refresh';
+- on an Org link (which should be alone on its line): replace the
+  link with a quote block, like `org-quote-link-at-point';
+- anywhere else: signal a `user-error' without modifying the buffer.
+
+The explicit commands `org-quote-link-at-point' and
+`org-quote-link-refresh' remain available when you want to force a
+specific action regardless of context."
+  (interactive)
+  (unless (derived-mode-p 'org-mode)
+    (user-error "Point is not in an Org buffer"))
+  (let ((block (org-quote-link--block-at-point)))
+    (cond
+     ((and block (org-quote-link--block-link-string block))
+      (org-quote-link-refresh))
+     ((org-quote-link--link-at-point-p)
+      (org-quote-link-at-point))
+     (t
+      (user-error
+       "Point is neither on an Org link nor in an org-quote-link block")))))
 
 (provide 'org-quote-link)
 ;;; org-quote-link.el ends here

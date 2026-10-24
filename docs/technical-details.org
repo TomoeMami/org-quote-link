@@ -5,6 +5,23 @@
 本文是 [[file:../README.org][README]] 的技术补充：链接类型范围、扩展接口、转义与刷新的具体规则、
 实现方式、测试和已知限制。安装与基本用法见 README。
 
+* 命令与分派
+
+| 命令                       | 行为                                                       |
+|----------------------------+------------------------------------------------------------|
+| =org-quote-link=           | DWIM：块内刷新；单行链接上转换；其它位置报错               |
+| =org-quote-link-at-point=  | 强制转换光标处的链接                                       |
+| =org-quote-link-refresh=   | 强制刷新光标所在的块                                       |
+
+=org-quote-link= 的分派顺序：
+
+1. 光标是否在带有 =#+HEADER: :transclude [[LINK]]= 行的块里？是 → 刷新；
+2. 否则，光标是否在 Org 链接上？是 → 转换（链接仍需独占一行）；
+3. 否则 → =user-error=，buffer 不变。
+
+因为块优先，所以块内部即使有链接也是刷新；需要转换块内链接时，直接调用
+=org-quote-link-at-point=。
+
 * 支持的链接类型
 
 本包只转换 [[info:org#Handling Links][org-store-link]] 能生成的链接。这是刻意的
@@ -243,15 +260,16 @@ heading 的 property drawer（=:PROPERTIES:= … =:END:=）默认被去掉，由
 =::#+name:=、=::text= 等写法，整个 Org 文件、非 Org 文件、=id:=、
 =org-store-link= 往返、转义、非 Org 转义开关、缩进、自我嵌套拒绝、行内链接
 拒绝、扩展 handler（改写链接 / 直接提供内容 / =:store= 类型自动解析）、
-刷新（自动生成块 / 手写块 / 非默认块类型 / 显式转义记录）、=include-headline=
+刷新（自动生成块 / 手写块 / 非默认块类型 / 显式转义记录）、统一命令的分派
+（链接转换 / 块内刷新 / 无操作时报错）、=include-headline=
 为 =nil= 时的 drawer/planning 排除、follow 只返回 buffer 不切换 buffer 的自定义
 链接、空操作 follow 的拒绝、整个当前文件的自我引用等。
 
 已验证矩阵：
 
-- Emacs 27.1 + Org 9.3：33/33 单测 + 48 条边界测试中 46 条通过、2 条按版本
+- Emacs 27.1 + Org 9.3：38/38 单测 + 48 条边界测试中 46 条通过、2 条按版本
   跳过（需要 Org 9.7+ 或 org-transclusion-blocks 的可选用例）；
-- Emacs 30.2 + Org 10.0pre：33/33 单测 + 48/48 边界测试通过。
+- Emacs 30.2 + Org 10.0pre：38/38 单测 + 48/48 边界测试通过。
 
 ** 可选的互操作测试
 
