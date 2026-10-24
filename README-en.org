@@ -16,13 +16,13 @@ After running the command:
 
 #+begin_src org
   #+HEADER: :transclude [[file:~/notes/emacs.org::*Org links]]
-  #+begin_quote
+  ,#+begin_quote
   ,* Org links
   The body of the heading……
 
   ,** A subheading
   Its body.
-  #+end_quote
+  ,#+end_quote
 #+end_src
 
 * Installation

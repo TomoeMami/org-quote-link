@@ -16,13 +16,13 @@
 
 #+begin_src org
   #+HEADER: :transclude [[file:~/notes/emacs.org::*Org 链接]]
-  #+begin_quote
+  ,#+begin_quote
   ,* Org 链接
   Org 链接的正文……
 
   ,** 子标题
   子标题的正文。
-  #+end_quote
+  ,#+end_quote
 #+end_src
 
 * 安装
