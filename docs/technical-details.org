@@ -54,7 +54,7 @@ CUSTOM_ID、target、 =#+name:= 、行/区域文字搜索、整个文件），�
 - 打开的 Org buffer：引用 point 所在的 heading / 元素；
 - 打开的其它文本 buffer：引用整个 buffer。
 
-因此像 =denote:=、=gnus:=、=rmail:=、=bbdb:=、=irc:=、=eww:=、=orgit= 这些
+因此像 =denote:= 、 =gnus:= 、 =rmail:= 、 =bbdb:= 、 =irc:= 、 =eww:= 、 =orgit= 这些
 能通过 =org-store-link= 保存的链接类型，原则上都能直接工作。具体引用到什么
 内容，取决于该链接的 follow 函数把 point 放在哪里。
 
@@ -79,9 +79,9 @@ CUSTOM_ID、target、 =#+name:= 、行/区域文字搜索、整个文件），�
 handler 接收链接元素（ =org-element= 的 link 对象），返回：
 
 1. =nil= ：不做处理，交给默认解析器；
-2. 一个链接字符串（如 =\"file:~/note.org::*标题\"=）：把它当作新链接继续解析。
+2. 一个链接字符串（如 =\"file:~/note.org::*标题\"= ）：把它当作新链接继续解析。
    适合把自定义类型映射成 =file:= 链接；
-3. 一个 plist =( :content STRING :org-p BOOL )=：直接把 =STRING= 当作原始内容，
+3. 一个 plist =( :content STRING :org-p BOOL )= ：直接把 =STRING= 当作原始内容，
    =:org-p= 决定是否做 Org 语法转义。
 
 handler 返回同类型链接且没有实际改变时会被拒绝，避免无限循环。
@@ -121,7 +121,7 @@ handler 返回同类型链接且没有实际改变时会被拒绝，避免无限
 #+end_src
 
 它用 =denote-get-path-by-id= 把 =denote:IDENTIFIER= 解析成
-=file:PATH=，并保留 =::*Heading= / =::#custom-id= 搜索后缀，所以下面这些都能
+=file:PATH= ，并保留 =::*Heading= / =::#custom-id= 搜索后缀，所以下面这些都能
 直接引用：
 
 #+begin_src org
@@ -178,10 +178,10 @@ Org affiliated keyword（本包自己的约定），不依赖任何外部包。
 
 ** heading 默认包含标题行
 
-=org-quote-link-include-headline= 默认 =t=：插入 =* 标题= 这一行和整个子树。
+=org-quote-link-include-headline= 默认 =t= ：插入 =* 标题= 这一行和整个子树。
 因为 heading 行和 =#+= 关键字在 quote-block 里会被重新解析（未转义的 =* 会
 直接截断 quote-block），所以插入前会用 =org-escape-code-in-region= 转义：
-行首的 =*=、=#+= 前面加逗号，得到 =,* 标题=、 =,#+begin_src= ……
+行首的 =*= 、 =#+= 前面加逗号，得到 =,* 标题= 、 =,#+begin_src= ……
 
 把 =org-quote-link-include-headline= 设为 =nil= 可以只引用标题下面的内容：
 标题行、planning line（ =SCHEDULED:= / =DEADLINE:= / =CLOSED:= ）和 property
@@ -192,12 +192,12 @@ drawer 都不会出现。
 - Org 来源（ =.org= 文件、 =id:= 、 =denote:= 等）：默认转义；
 - 非 Org 来源（ =.txt= 、源码文件等）：默认原样插入。
 
-非 Org 内容里的行首 =*=、=#+= 可能破坏 quote-block，可以打开
+非 Org 内容里的行首 =*= 、 =#+= 可能破坏 quote-block，可以打开
 =org-quote-link-escape-non-org-syntax= 规避。
 
 ** 内容排除
 
-heading 的 property drawer（ =:PROPERTIES:= … =:END:=）默认被去掉，由
+heading 的 property drawer（ =:PROPERTIES:= … =:END:= ）默认被去掉，由
 =org-quote-link-exclude-elements= 控制。设为 =nil= 可以保留。
 
 ** 其它
@@ -226,7 +226,7 @@ heading 的 property drawer（ =:PROPERTIES:= … =:END:=）默认被去掉，�
   它能自动复用 Org 对 heading 搜索、CUSTOM_ID、org-id、target、命名元素、
   =::text= 搜索以及第三方链接类型的全部支持。打开时：
   - 绑定 =display-buffer-alist= 为 =display-buffer-no-window= ，不弹窗；
-  - 绑定 =org-link-search-must-match-exact-headline= 为 =nil=：既不弹出
+  - 绑定 =org-link-search-must-match-exact-headline= 为 =nil= ：既不弹出
     “No match - create this as a new heading?”，又允许 =org-store-link= 生成的
     =file:...::某行文字= 这种纯文本搜索；
   - 绑定 =org-file-apps= 为 =((t . emacs))= ，避免为本该引用的文件启动外部程序；
@@ -236,9 +236,9 @@ heading 的 property drawer（ =:PROPERTIES:= … =:END:=）默认被去掉，�
   =org-element-parse-buffer= + =org-element-interpret-data= 还原成纯文本，
   并剔除 =org-quote-link-exclude-elements= （默认 property drawer、不包含
   heading 时也剔除 planning line）。
-- *转义* ：用 Org 自带的 =org-escape-code-in-region=，行首的 =*= / =#+= 前加
+- *转义* ：用 Org 自带的 =org-escape-code-in-region= ，行首的 =*= / =#+= 前加
   逗号。
-- *块格式* ： =#+HEADER: :transclude [[LINK]]= + =#+begin_quote=；=org-element=
+- *块格式* ： =#+HEADER: :transclude [[LINK]]= + =#+begin_quote= ； =org-element=
   会把 =#+HEADER:= 解析成块的 =:header= 属性，所以 =org-quote-link-refresh=
   不需要任何外部包就能找到链接。
 
@@ -256,8 +256,8 @@ heading 的 property drawer（ =:PROPERTIES:= … =:END:=）默认被去掉，�
   ./test/run-tests.sh org-quote-link-test-file-heading   # 只跑一个
 #+end_src
 
-测试覆盖： =file:= 链接的 =::*heading=、 =::#custom-id= 、 =::target= 、
-=::#+name:=、 =::text= 等写法，整个 Org 文件、非 Org 文件、 =id:= 、
+测试覆盖： =file:= 链接的 =::*heading= 、 =::#custom-id= 、 =::target= 、
+=::#+name:= 、 =::text= 等写法，整个 Org 文件、非 Org 文件、 =id:= 、
 =org-store-link= 往返、转义、非 Org 转义开关、缩进、自我嵌套拒绝、行内链接
 拒绝、扩展 handler（改写链接 / 直接提供内容 / =:store= 类型自动解析）、
 刷新（自动生成块 / 手写块 / 非默认块类型 / 显式转义记录）、统一命令的分派
@@ -274,7 +274,7 @@ heading 的 property drawer（ =:PROPERTIES:= … =:END:=）默认被去掉，�
 ** 可选的互操作测试
 
 =test/org-quote-link-interop-test.el= 额外检查生成的块能否被
-org-transclusion-blocks 的 add 命令接受和刷新。它 *不参与* =make test=，
+org-transclusion-blocks 的 add 命令接受和刷新。它 *不参与* =make test= ，
 也不是本包的依赖；只有在装好 =org-transclusion= / =org-transclusion-blocks=
 的较新 Emacs 上才需要它：
 

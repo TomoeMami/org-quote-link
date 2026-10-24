@@ -4,7 +4,7 @@
 
 [[file:README.org][中文]] · English
 
-Put point on an Org link and run =org-quote-link=; the link line is replaced by
+Put point on an Org link and run =org-quote-link= and the link line is replaced by
 a quote block whose header carries the link and whose body is an escaped
 snapshot of the target.
 
@@ -39,7 +39,7 @@ does not need, load, or call org-transclusion or org-transclusion-blocks.
            ("C-c Q" . org-quote-link-refresh)))
 #+end_src
 
-Without =use-package=:
+You can also install it without =use-package= by adding:
 
 #+begin_src emacs-lisp
   (add-to-list 'load-path "/path/to/org-quote-link")
@@ -64,7 +64,7 @@ force a specific action.
 
 ** Convert a link (explicit command)
 
-With point on the link, run =org-quote-link-at-point=. Rules:
+With point on the link, run =org-quote-link-at-point= and follow these rules:
 
 - The link must be alone on its line (leading whitespace is fine); an inline
   link signals an error and leaves the buffer unchanged.
