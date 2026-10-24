@@ -1,0 +1,140 @@
+#+title: org-quote-link
+#+author: Riko
+#+options: toc:nil num:nil
+
+[[file:README.org][中文]] · English
+
+Put point on an Org link and run =org-quote-link=; the link line is replaced by
+a quote block whose header carries the link and whose body is an escaped
+snapshot of the target.
+
+#+begin_src org
+  [[file:~/notes/emacs.org::*Org links]]
+#+end_src
+
+After running the command:
+
+#+begin_src org
+  #+HEADER: :transclude [[file:~/notes/emacs.org::*Org links]]
+  #+begin_quote
+  ,* Org links
+  The body of the heading……
+
+  ,** A subheading
+  Its body.
+  #+end_quote
+#+end_src
+
+* Installation
+
+Requirements: Emacs 27.1 and Org 9.3. The package depends on Org only; it
+does not need, load, or call org-transclusion or org-transclusion-blocks.
+
+#+begin_src emacs-lisp
+  (use-package org-quote-link
+    :ensure nil                     ; not on ELPA
+    :load-path "/path/to/org-quote-link"
+    :bind (("C-c q" . org-quote-link)
+           :map org-mode-map
+           ("C-c Q" . org-quote-link-refresh)))
+#+end_src
+
+Without =use-package=:
+
+#+begin_src emacs-lisp
+  (add-to-list 'load-path "/path/to/org-quote-link")
+  (require 'org-quote-link)
+#+end_src
+
+* Usage
+
+** Recommended entry point
+
+Bind =org-quote-link= and let it pick the action from the position of point:
+
+| Point position                                        | Action                        |
+|-------------------------------------------------------+-------------------------------|
+| Inside a block with a =#+HEADER: :transclude [[LINK]]= line | Refresh that block            |
+| On a single-line Org link                             | Convert it into a quote block |
+| Anywhere else                                         | Signal an error, leave buffer |
+
+Blocks are checked before links, so a link inside such a block triggers a
+refresh. The two explicit commands below are still available when you want to
+force a specific action.
+
+** Convert a link (explicit command)
+
+With point on the link, run =org-quote-link-at-point=. Rules:
+
+- The link must be alone on its line (leading whitespace is fine); an inline
+  link signals an error and leaves the buffer unchanged.
+- Only link types produced by =org-store-link= are accepted: =file:= links
+  (headings, CUSTOM_ID, targets, named elements, text searches, whole files),
+  =id:= links, and third-party types that register a =:store= function (for
+  example denote).
+- By default a heading is quoted together with its headline line; set
+  =org-quote-link-include-headline= to nil to quote only its contents. Org
+  sources are comma-escaped so that lines starting with =*= or =#+= cannot
+  break the quote block.
+
+See the technical details linked below for the full link-type table.
+
+** Refresh (explicit command)
+
+A quote block is a snapshot. Put point inside the block and run
+=org-quote-link-refresh= to fetch the content again; point may be on the
+header, begin, body, or end line. The command depends on Org only and uses
+the =#+HEADER: :transclude [[LINK]]= line to find the link.
+
+Running =org-quote-link= inside the block does the same thing.
+
+** Common settings
+
+| Variable                                 | Default | Purpose                        |
+|------------------------------------------+---------+--------------------------------|
+| =org-quote-link-block-type=              | "quote" | Block type to generate         |
+| =org-quote-link-include-headline=        | t       | Include the heading line       |
+| =org-quote-link-escape-non-org-syntax=   | nil     | Escape non-Org content as well |
+| =org-quote-link-link-handlers=           | denote  | Extend custom link types       |
+
+See the technical details for the remaining variables and the extension
+interface.
+
+* Differences from org-transclusion-blocks
+
+Both use a =#+HEADER: :transclude [[LINK]]= line plus a quote block, but they
+serve different purposes. org-quote-link is a zero-dependency helper that only
+turns the link at point into a quote block and stores a snapshot.
+org-transclusion-blocks is a component-based transclusion framework that
+fetches, refreshes, adjusts ranges, and adds overlays under its own header
+syntax.
+
+| Aspect            | org-quote-link                            | org-transclusion-blocks                         |
+|-------------------+-------------------------------------------+-------------------------------------------------|
+| Dependencies      | Org only (Emacs 27.1, Org 9.3)            | Emacs 29.1, Org 9.7, org-transclusion 1.4       |
+| Purpose           | One command: link to quote-block snapshot | Framework: write headers/blocks, then fetch     |
+| Input             | An existing org-link at point             | Existing headers and blocks                     |
+| Link types        | Types produced by org-store-link          | Everything the org-transclusion fetchers handle |
+| Content granularity | Heading, element, whole file            | Also lines, thing-at-point, only-contents, etc. |
+| Block types       | quote (configurable to example or verse)  | src, quote, example, special, …; src uses Babel |
+| Refresh           | Built-in org-quote-link-refresh           | org-transclusion-blocks-add or its menu         |
+| Escaping          | Org sources escaped, non-Org verbatim     | Controlled by org-transclusion-blocks options   |
+| Metadata          | None; plain text output                   | Text properties, overlays, etc.                 |
+| Self-reference    | Refuses heading/element/whole-file nesting | Has its own checks                             |
+
+How to choose:
+
+- Use org-quote-link if you want a one-command conversion, zero dependencies,
+  and a built-in refresh command.
+- Use org-transclusion-blocks if you need lines, thing-at-point, component
+  types, menus, or overlays.
+- They can coexist: the format produced by org-quote-link follows the same
+  header convention, so the blocks add command usually understands it. That
+  is optional interoperability, not a dependency of org-quote-link; see the
+  technical details for the caveats.
+
+* More documentation
+
+- Technical details: [[file:docs/technical-details.org][technical-details.org]] (in Chinese)
+- Background notes: [[file:docs/org-transclusion-reference.md][org-transclusion-reference.md]] (in Chinese)
+- Chinese README: [[file:README.org][README.org]]

@@ -17,10 +17,10 @@
 
 1. 光标是否在带有 =#+HEADER: :transclude [[LINK]]= 行的块里？是 → 刷新；
 2. 否则，光标是否在 Org 链接上？是 → 转换（链接仍需独占一行）；
-3. 否则 → =user-error=，buffer 不变。
+3. 否则 → =user-error= ，buffer 不变。
 
 因为块优先，所以块内部即使有链接也是刷新；需要转换块内链接时，直接调用
-=org-quote-link-at-point=。
+=org-quote-link-at-point= 。
 
 * 支持的链接类型
 
@@ -39,16 +39,16 @@
 | =[[file:foo.org]]=                   | 整个 Org 文件                      |
 | =[[file:foo.txt]]=                   | 整个非 Org 文本文件                |
 | =[[id:UUID]]=                        | org-id 指向的 heading + 子树       |
-| =[[id:UUID::*标题]]=                 | 同上，=::搜索= 需要 Org 9.7+       |
+| =[[id:UUID::*标题]]=                 | 同上， =::搜索= 需要 Org 9.7+       |
 
 这些写法覆盖了 =org-store-link= 在 Org buffer 里最常生成的输出（heading、
-CUSTOM_ID、target、=#+name:=、行/区域文字搜索、整个文件），以及 org-id 的
+CUSTOM_ID、target、 =#+name:= 、行/区域文字搜索、整个文件），以及 org-id 的
 =id:= 链接。
 
 ** 自动支持：任何注册了 =:store= 的链接类型
 
 =org-store-link= 还会调用各链接类型注册的 =:store= 函数来生成链接。只要某个
-类型定义了 =:store=（并且它的 follow 函数会打开一个文本 buffer），本包就会
+类型定义了 =:store= （并且它的 follow 函数会打开一个文本 buffer），本包就会
 尝试打开它并引用：
 
 - 打开的 Org buffer：引用 point 所在的 heading / 元素；
@@ -63,12 +63,12 @@ CUSTOM_ID、target、=#+name:=、行/区域文字搜索、整个文件），以�
 
 ** 默认不支持的链接类型
 
-下面这些不是 =org-store-link= 的输出，默认会被拒绝（报 =user-error=，不会改
+下面这些不是 =org-store-link= 的输出，默认会被拒绝（报 =user-error= ，不会改
 动 buffer）：
 
-- fringe 链接：=[[标题]]=、=[[*标题]]=；
-- 手写 custom-id 链接：=[[#custom-id]]=；
-- 普通 URL：=[[https://example.com]]=；
+- fringe 链接： =[[标题]]= 、 =[[*标题]]= ；
+- 手写 custom-id 链接： =[[#custom-id]]= ；
+- 普通 URL： =[[https://example.com]]= ；
 - 其它没有 =:store= 的第三方类型。
 
 要支持它们，加一个 handler，见下一节。
@@ -76,9 +76,9 @@ CUSTOM_ID、target、=#+name:=、行/区域文字搜索、整个文件），以�
 * 扩展接口
 
 =org-quote-link-link-handlers= 是一个 =(链接类型 . handler)= 的 alist。
-handler 接收链接元素（=org-element= 的 link 对象），返回：
+handler 接收链接元素（ =org-element= 的 link 对象），返回：
 
-1. =nil=：不做处理，交给默认解析器；
+1. =nil= ：不做处理，交给默认解析器；
 2. 一个链接字符串（如 =\"file:~/note.org::*标题\"=）：把它当作新链接继续解析。
    适合把自定义类型映射成 =file:= 链接；
 3. 一个 plist =( :content STRING :org-p BOOL )=：直接把 =STRING= 当作原始内容，
@@ -130,15 +130,15 @@ handler 返回同类型链接且没有实际改变时会被拒绝，避免无限
   [[denote:20240101T120000::#custom-id]]
 #+end_src
 
-如果 denote 的标识符不是 ID 形式（=denote:= 还支持按内容/文件名查询的
+如果 denote 的标识符不是 ID 形式（ =denote:= 还支持按内容/文件名查询的
 “query link”），handler 会报错；这种情况可以用示例 2 的方式自定义。
 
 * 刷新
 
-生成出来的块是一份快照。=org-quote-link-refresh= 只依赖 Org，读取块里的
+生成出来的块是一份快照。 =org-quote-link-refresh= 只依赖 Org，读取块里的
 =#+HEADER: :transclude [[LINK]]= 行，重新解析链接、抓取内容并替换正文。
 光标在 header / begin / 正文 / end 行都可以。在默认设置下
-（=org-quote-link-include-headline= 为 =t=），刷新结果和第一次转换一致。
+（ =org-quote-link-include-headline= 为 =t= ），刷新结果和第一次转换一致。
 
 如果链接指向的对象正好包含当前这个块（自我嵌套：heading、元素或整个当前
 文件），会拒绝执行。
@@ -146,7 +146,7 @@ handler 返回同类型链接且没有实际改变时会被拒绝，避免无限
 ** 转义记录
 
 如果转义决定与“Org 来源转义、非 Org 来源不转义”的自然情况不同（例如打开了
-=org-quote-link-escape-non-org-syntax=，或关掉了 Org 转义），生成出来的块会
+=org-quote-link-escape-non-org-syntax= ，或关掉了 Org 转义），生成出来的块会
 自动多写一行：
 
 #+begin_src org
@@ -163,17 +163,17 @@ Org affiliated keyword（本包自己的约定），不依赖任何外部包。
 本包的依赖；两边的差异由它自己决定，不在本包的保证范围内，例如：
 
 - blocks-add 要求光标在 =#+HEADER:= / =#+begin_= / =#+end_= 行上；
-- 它支持的搜索形式有限（=::行文字= 之类的搜索它不认）；
+- 它支持的搜索形式有限（ =::行文字= 之类的搜索它不认）；
 - 它重新抓取时会保留源内容末尾的空行；
 - 它不读取本包的 =org-quote-link-include-headline= 设置。
 
-需要与快照完全一致时，用 =org-quote-link-refresh=。
+需要与快照完全一致时，用 =org-quote-link-refresh= 。
 
 * 行为细节
 
 ** 链接必须单独占一行
 
-只允许行首空白。行内链接（=see [[link]] here=）会报错，因为把句子中间的东西
+只允许行首空白。行内链接（ =see [[link]] here= ）会报错，因为把句子中间的东西
 变成块没有合理语义。块的分隔行会继承原行的缩进（空格/TAB 都按原字符保留）。
 
 ** heading 默认包含标题行
@@ -181,30 +181,30 @@ Org affiliated keyword（本包自己的约定），不依赖任何外部包。
 =org-quote-link-include-headline= 默认 =t=：插入 =* 标题= 这一行和整个子树。
 因为 heading 行和 =#+= 关键字在 quote-block 里会被重新解析（未转义的 =* 会
 直接截断 quote-block），所以插入前会用 =org-escape-code-in-region= 转义：
-行首的 =*=、=#+= 前面加逗号，得到 =,* 标题=、=,#+begin_src=……
+行首的 =*=、=#+= 前面加逗号，得到 =,* 标题=、 =,#+begin_src= ……
 
 把 =org-quote-link-include-headline= 设为 =nil= 可以只引用标题下面的内容：
-标题行、planning line（=SCHEDULED:= / =DEADLINE:= / =CLOSED:=）和 property
+标题行、planning line（ =SCHEDULED:= / =DEADLINE:= / =CLOSED:= ）和 property
 drawer 都不会出现。
 
 ** 转义策略
 
-- Org 来源（=.org= 文件、=id:=、=denote:= 等）：默认转义；
-- 非 Org 来源（=.txt=、源码文件等）：默认原样插入。
+- Org 来源（ =.org= 文件、 =id:= 、 =denote:= 等）：默认转义；
+- 非 Org 来源（ =.txt= 、源码文件等）：默认原样插入。
 
 非 Org 内容里的行首 =*=、=#+= 可能破坏 quote-block，可以打开
 =org-quote-link-escape-non-org-syntax= 规避。
 
 ** 内容排除
 
-heading 的 property drawer（=:PROPERTIES:= … =:END:=）默认被去掉，由
+heading 的 property drawer（ =:PROPERTIES:= … =:END:=）默认被去掉，由
 =org-quote-link-exclude-elements= 控制。设为 =nil= 可以保留。
 
 ** 其它
 
 - 链接的 description 会原样保留在 header 里。
 - 目标文件不存在、链接打不开、类型不支持、指向非文本 buffer 等情况都会在
-  改动 buffer 之前报 =user-error=，原链接保持不变。
+  改动 buffer 之前报 =user-error= ，原链接保持不变。
 - 当前 buffer / point / 窗口都会恢复；被打开的源 buffer 不会被显示，但它的
   point 会移动到链接目标位置。
 - 命令转换后 point 停在块的 =#+HEADER:= 行。
@@ -222,23 +222,23 @@ heading 的 property drawer（=:PROPERTIES:= … =:END:=）默认被去掉，由
 
 * 实现说明（只用 Org 自己的 API）
 
-- *链接解析*：用 =org-link-open= 打开链接，而不是自己解析 path/search。
+- *链接解析* ：用 =org-link-open= 打开链接，而不是自己解析 path/search。
   它能自动复用 Org 对 heading 搜索、CUSTOM_ID、org-id、target、命名元素、
   =::text= 搜索以及第三方链接类型的全部支持。打开时：
-  - 绑定 =display-buffer-alist= 为 =display-buffer-no-window=，不弹窗；
+  - 绑定 =display-buffer-alist= 为 =display-buffer-no-window= ，不弹窗；
   - 绑定 =org-link-search-must-match-exact-headline= 为 =nil=：既不弹出
     “No match - create this as a new heading?”，又允许 =org-store-link= 生成的
     =file:...::某行文字= 这种纯文本搜索；
-  - 绑定 =org-file-apps= 为 =((t . emacs))=，避免为本该引用的文件启动外部程序；
+  - 绑定 =org-file-apps= 为 =((t . emacs))= ，避免为本该引用的文件启动外部程序；
   - 用 =save-window-excursion= + =save-excursion= 包裹，当前 buffer / point /
     窗口在调用后都会恢复。
-- *内容提取*：对 Org 目标，按 heading / element / 文件三种粒度取区域，用
+- *内容提取* ：对 Org 目标，按 heading / element / 文件三种粒度取区域，用
   =org-element-parse-buffer= + =org-element-interpret-data= 还原成纯文本，
-  并剔除 =org-quote-link-exclude-elements=（默认 property drawer、不包含
+  并剔除 =org-quote-link-exclude-elements= （默认 property drawer、不包含
   heading 时也剔除 planning line）。
-- *转义*：用 Org 自带的 =org-escape-code-in-region=，行首的 =*= / =#+= 前加
+- *转义* ：用 Org 自带的 =org-escape-code-in-region=，行首的 =*= / =#+= 前加
   逗号。
-- *块格式*：=#+HEADER: :transclude [[LINK]]= + =#+begin_quote=；=org-element=
+- *块格式* ： =#+HEADER: :transclude [[LINK]]= + =#+begin_quote=；=org-element=
   会把 =#+HEADER:= 解析成块的 =:header= 属性，所以 =org-quote-link-refresh=
   不需要任何外部包就能找到链接。
 
@@ -256,12 +256,12 @@ heading 的 property drawer（=:PROPERTIES:= … =:END:=）默认被去掉，由
   ./test/run-tests.sh org-quote-link-test-file-heading   # 只跑一个
 #+end_src
 
-测试覆盖：=file:= 链接的 =::*heading=、=::#custom-id=、=::target=、
-=::#+name:=、=::text= 等写法，整个 Org 文件、非 Org 文件、=id:=、
+测试覆盖： =file:= 链接的 =::*heading=、 =::#custom-id= 、 =::target= 、
+=::#+name:=、 =::text= 等写法，整个 Org 文件、非 Org 文件、 =id:= 、
 =org-store-link= 往返、转义、非 Org 转义开关、缩进、自我嵌套拒绝、行内链接
 拒绝、扩展 handler（改写链接 / 直接提供内容 / =:store= 类型自动解析）、
 刷新（自动生成块 / 手写块 / 非默认块类型 / 显式转义记录）、统一命令的分派
-（链接转换 / 块内刷新 / 无操作时报错）、=include-headline=
+（链接转换 / 块内刷新 / 无操作时报错）、 =include-headline=
 为 =nil= 时的 drawer/planning 排除、follow 只返回 buffer 不切换 buffer 的自定义
 链接、空操作 follow 的拒绝、整个当前文件的自我引用等。
 
@@ -274,7 +274,7 @@ heading 的 property drawer（=:PROPERTIES:= … =:END:=）默认被去掉，由
 ** 可选的互操作测试
 
 =test/org-quote-link-interop-test.el= 额外检查生成的块能否被
-org-transclusion-blocks 的 add 命令接受和刷新。它**不参与** =make test=，
+org-transclusion-blocks 的 add 命令接受和刷新。它 *不参与* =make test=，
 也不是本包的依赖；只有在装好 =org-transclusion= / =org-transclusion-blocks=
 的较新 Emacs 上才需要它：
 
@@ -292,14 +292,14 @@ denote 链接、带 description 的链接等）。
 
 * 文件
 
-- =org-quote-link.el=：包本体（单文件，只依赖 Org）。
-- =test/org-quote-link-test.el=：主单测（不依赖第三方包）。
-- =test/org-quote-link-edge-test.el=：对抗性边界测试（48 条；两个版本敏感的
+- =org-quote-link.el= ：包本体（单文件，只依赖 Org）。
+- =test/org-quote-link-test.el= ：主单测（不依赖第三方包）。
+- =test/org-quote-link-edge-test.el= ：对抗性边界测试（48 条；两个版本敏感的
   用例会自动跳过）。
-- =test/org-quote-link-interop-test.el=：可选的 org-transclusion-blocks 互操作
+- =test/org-quote-link-interop-test.el= ：可选的 org-transclusion-blocks 互操作
   测试（不参与默认测试，不是依赖）。
-- =test/run-tests.sh=、=Makefile=：批处理运行入口。
-- =docs/org-transclusion-reference.md=：背景资料（对 org-transclusion /
+- =test/run-tests.sh= 、 =Makefile= ：批处理运行入口。
+- =docs/org-transclusion-reference.md= ：背景资料（对 org-transclusion /
   org-store-link 源码的考证，供理解格式与限制之用，不是依赖）。
 
 * 已知限制 / 可以继续做的事
@@ -311,5 +311,5 @@ denote 链接、带 description 的链接等）。
   不一定等于“这条消息的内容”（例如 Gnus 可能停在 summary buffer）；需要精确
   内容时用 handler 提供；
 - handler 直接返回 =:content= 的块无法被外部工具重新抓取，请用
-  =org-quote-link-refresh=；
+  =org-quote-link-refresh= ；
 - 目前只处理单个链接；批量转换 region / 整份文件是自然的下一步。

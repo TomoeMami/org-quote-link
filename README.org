@@ -2,14 +2,17 @@
 #+author: Riko
 #+options: toc:nil num:nil
 
-把光标放在一个 Org 链接上，执行 =org-quote-link-at-point=，链接所在行就会变成
-一个带 header 链接的 quote-block，内容是链接所指对象的转义快照：
+[[file:README-en.org][English]] · 中文
+
+把光标放在一个 Org 链接上，执行 =org-quote-link= 命令，链接所在行就会变成一个
+“引用块”：链接放进 header，链接指向的内容以转义后的快照形式放进
+=#+begin_quote= 与 =#+end_quote= 之间。
 
 #+begin_src org
   [[file:~/notes/emacs.org::*Org 链接]]
 #+end_src
 
-→
+执行之后：
 
 #+begin_src org
   #+HEADER: :transclude [[file:~/notes/emacs.org::*Org 链接]]
@@ -24,7 +27,7 @@
 
 * 安装
 
-要求：Emacs 27.1 + Org 9.3。**本包只依赖 Org 自身**，不需要、也不会加载
+要求 Emacs 27.1 与 Org 9.3。本包只依赖 Org 自身，不需要
 org-transclusion 或 org-transclusion-blocks。
 
 #+begin_src emacs-lisp
@@ -36,7 +39,7 @@ org-transclusion 或 org-transclusion-blocks。
            ("C-c Q" . org-quote-link-refresh)))
 #+end_src
 
-不用 =use-package= 的话：
+不使用 =use-package= 时：
 
 #+begin_src emacs-lisp
   (add-to-list 'load-path "/path/to/org-quote-link")
@@ -47,95 +50,80 @@ org-transclusion 或 org-transclusion-blocks。
 
 ** 推荐入口
 
-只绑定一个命令 =M-x org-quote-link= 就够了。它会根据光标位置自动分派：
+只绑定 =org-quote-link= 一个命令即可。它会根据光标位置自动选择动作：
 
-| 光标位置                                       | 动作                       |
-|------------------------------------------------+----------------------------|
-| 带 =#+HEADER: :transclude [[LINK]]= 的块内部     | 刷新这个块                 |
-| 单行 Org 链接上                                 | 把链接转换成引用块         |
-| 其它位置                                       | 报 =user-error=，不改 buffer |
+| 光标位置                                       | 动作               |
+|------------------------------------------------+--------------------|
+| 带有 =#+HEADER: :transclude [[LINK]]= 的块内部 | 刷新该块           |
+| 单行 Org 链接上                                | 把链接转换成引用块 |
+| 其它位置                                       | 报错，不修改 buffer |
 
-分派时优先看“是否在块里”，再看“是否在链接上”；因此块里的链接也会触发刷新。
-
-如果想跳过判断、强制做某个动作，仍然可以直接调用下面两个显式命令。
+分派时先判断块、再判断链接，因此块里的链接也会触发刷新。需要强制指定动作时，
+仍可使用下面两个显式命令。
 
 ** 转换链接（显式命令）
 
-光标放在链接上，执行：
+光标放在链接上，执行 =org-quote-link-at-point= 命令。规则如下：
 
-#+begin_src emacs-lisp
-  M-x org-quote-link-at-point
-#+end_src
+- 链接必须单独占一行，行首可以有空白；行内链接会报错，buffer 保持不变。
+- 链接类型以 =org-store-link= 能生成的为准：支持 =file:= 链接（heading、
+  CUSTOM_ID、target、命名元素、文字搜索、整个文件等）、 =id:= 链接，以及
+  注册了 =:store= 的第三方类型（例如 denote）。
+- heading 默认连标题行一起引用，可用 =org-quote-link-include-headline= 关闭；
+  Org 来源会做逗号转义，避免 =*= 与 =#+= 开头的行破坏 quote-block。
 
-几条规则：
-
-- 链接必须单独占一行（行首可以有空白）；行内链接会报错，不改动 buffer。
-- 链接类型以 =org-store-link= 能生成的为准：=file:= 链接（heading、=#custom-id=、
-  target、=#+name:=、行/区域文字搜索、整个文件）、=id:=，以及注册了 =:store=
-  的第三方类型（如 denote）。手动输入的 fringe 链接、=[[#custom-id]]=、
-  =https:= 等默认拒绝。
-- heading 默认连标题行一起引用（=org-quote-link-include-headline= 可关），
-  Org 来源会做逗号转义，避免 =*= / =#+= 行破坏 quote-block。
-
-完整链接类型表与行为细节见 [[file:docs/technical-details.org][技术细节]]。
+完整的链接类型表与行为细节见 “更多文档” 中的技术细节。
 
 ** 刷新（显式命令）
 
-引用块是快照。要重新抓取，把光标放在块里，执行：
+引用块保存的是快照。把光标放在块里，执行 =org-quote-link-refresh= 命令即可
+重新抓取内容；光标在 header、begin、正文、end 行都可以。它只依赖 Org 自身，
+读取块里的 =#+HEADER: :transclude [[LINK]]= 行来定位链接。
 
-#+begin_src emacs-lisp
-  M-x org-quote-link-refresh
-#+end_src
-
-（=M-x org-quote-link= 在块里执行时也会做同样的事。）
-
-它只依赖 Org，读取块里的 =#+HEADER: :transclude [[LINK]]= 行重新解析和替换
-正文；光标在 header / begin / 正文 / end 行都可以。
+在块里执行 =org-quote-link= 命令等同于刷新。
 
 ** 常用设置
 
-| 变量                                   | 默认值   | 作用                          |
-|----------------------------------------+----------+-------------------------------|
-| =org-quote-link-block-type=            | ="quote"= | 生成的块类型（quote/example…）|
-| =org-quote-link-include-headline=      | =t=       | heading 是否包含标题行        |
-| =org-quote-link-escape-non-org-syntax= | =nil=     | 是否也转义非 Org 文件内容     |
-| =org-quote-link-link-handlers=         | denote   | 扩展/自定义链接类型           |
+| 变量                                   | 默认值  | 作用                   |
+|----------------------------------------+---------+------------------------|
+| =org-quote-link-block-type=            | "quote" | 生成的块类型           |
+| =org-quote-link-include-headline=      | t       | heading 是否包含标题行 |
+| =org-quote-link-escape-non-org-syntax= | nil     | 是否转义非 Org 内容    |
+| =org-quote-link-link-handlers=         | denote  | 扩展链接类型的 alist   |
 
-其它变量和扩展接口（handler 协议、denote、自定义类型示例）见
-[[file:docs/technical-details.org][技术细节]]。
+更多变量与扩展接口见 “更多文档” 中的技术细节。
 
 * 与 org-transclusion-blocks 的差异对比
 
-两者都会生成 =#+HEADER: :transclude [[LINK]]= + quote-block；但定位不同：
-=org-quote-link= 是一个**零依赖的小工具**，只负责“把光标处的链接变成引用块并
-保存一份快照”；=org-transclusion-blocks= 是一套**组件化 transclusion 框架**，
-负责在自己的 header 语法下抓取、刷新、调整范围和加 overlay。
+两者都使用 =#+HEADER: :transclude [[LINK]]= 加 quote-block 的形式，但定位不同：
+org-quote-link 是零依赖的小工具，只负责把光标处的链接变成引用块并保存快照；
+org-transclusion-blocks 是组件化 transclusion 框架，负责在自己的 header 语法下
+抓取、刷新、调整范围并添加 overlay。
 
-| 维度             | org-quote-link                                   | org-transclusion-blocks                          |
-|------------------+--------------------------------------------------+--------------------------------------------------|
-| 依赖             | 只依赖 Org（Emacs 27.1 + Org 9.3）               | Emacs 29.1 + Org 9.7 + org-transclusion 1.4      |
-| 定位             | 一条命令：链接 → 静态引用块快照                  | 框架：手写 header/block，再用命令抓取内容        |
-| 输入方式         | 光标处的现有 org-link                            | 已有的 =#+HEADER: :transclude …= + block         |
-| 链接范围         | 刻意收窄到 =org-store-link= 能生成的类型         | org-transclusion 的 fetchers 能处理的所有类型    |
-| 内容粒度         | heading（含标题行）/ 元素 / 整个文件             | 还有 =:lines=、=:thing-at-point=、=:only-contents=、=:level=、=:expand-links= 等 |
-| block 类型       | quote（可配置 example/verse）                    | src/quote/example/special/export/comment…，src 走 Babel |
-| 刷新命令         | 自带的 =org-quote-link-refresh=（只依赖 Org）    | =org-transclusion-blocks-add= / transient 菜单   |
-| 转义             | Org 来源转义、非 Org 原样，可配置；非默认决定会记录在块里 | =org-transclusion-blocks-escape-org-sources= + =:transclude-escape-org= |
-| 元数据/overlay   | 不添加，输出就是纯文本                           | 添加 text properties、overlay、刷新时间等        |
-| 自引用           | 拒绝 heading / 元素 / 整个当前文件的自我嵌套     | 有自己的检查逻辑                                 |
+| 维度     | org-quote-link                          | org-transclusion-blocks                        |
+|----------+-----------------------------------------+------------------------------------------------|
+| 依赖     | 只依赖 Org（Emacs 27.1 与 Org 9.3）     | Emacs 29.1、Org 9.7、org-transclusion 1.4      |
+| 定位     | 一条命令完成链接到引用块的转换          | 手写 header 与 block，再执行命令抓取           |
+| 输入     | 光标处的 org-link                       | 已有的 header 与 block                         |
+| 链接范围 | org-store-link 能生成的类型             | org-transclusion 的 fetcher 能处理的类型       |
+| 内容粒度 | heading、元素、整个文件                 | 还可使用行号、thing-at-point、only-contents 等 |
+| 块类型   | quote（可改为 example 或 verse）        | src、quote、example、special 等，src 走 Babel  |
+| 刷新     | 自带的 org-quote-link-refresh           | org-transclusion-blocks-add 或菜单             |
+| 转义     | Org 来源转义，非 Org 原样，可配置       | 由 org-transclusion-blocks 的选项控制          |
+| 元数据   | 不添加，输出纯文本                      | 添加 text properties、overlay 等               |
+| 自引用   | 拒绝 heading、元素、整个当前文件的嵌套  | 有自己的检查逻辑                               |
 
 怎么选：
 
-- 只是想让“链接 → 引用块”一步完成、保持零依赖、用自带命令刷新：用
-  =org-quote-link=；
-- 需要 =:lines= / =:thing-at-point= / 组件类型 / 菜单和 overlay：用
-  =org-transclusion-blocks=；
-- 两者可以共存：=org-quote-link= 生成的格式与 blocks 的 header 约定相同，
-  装了 blocks 时它的 add 命令通常也能识别（**可选互操作，不是本包的依赖**）。
-  相关差异和注意事项见 [[file:docs/technical-details.org][技术细节]]。
+- 想要一条命令完成转换、保持零依赖、用自带命令刷新，请用 org-quote-link。
+- 需要行号、thing-at-point、组件类型、菜单或 overlay，请用
+  org-transclusion-blocks。
+- 两者可以共存：org-quote-link 生成的格式与 blocks 的 header 约定相同，
+  装了 blocks 时它的 add 命令通常也能识别。这是可选的互操作，不是
+  org-quote-link 的依赖；差异与注意事项见 “更多文档” 中的技术细节。
 
 * 更多文档
 
-- [[file:docs/technical-details.org][技术细节]]：完整链接类型表、扩展接口、转义与刷新细节、实现方式、测试。
-- [[file:docs/org-transclusion-reference.md][背景资料]]：对 org-store-link / org-transclusion-blocks 源码的考证，
-  只作理解格式与限制之用，不是本包的依赖。
+- 技术细节： [[file:docs/technical-details.org][technical-details.org]] （链接类型、扩展接口、转义与刷新规则、实现、测试）
+- 背景资料： [[file:docs/org-transclusion-reference.md][org-transclusion-reference.md]] （源码考证，不是依赖）
+- English README： [[file:README-en.org][README-en.org]]
