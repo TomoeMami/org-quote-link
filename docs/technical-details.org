@@ -7,11 +7,12 @@
 
 * 命令与分派
 
-| 命令                       | 行为                                                       |
-|----------------------------+------------------------------------------------------------|
-| =org-quote-link=           | DWIM：块内刷新；单行链接上转换；其它位置报错               |
-| =org-quote-link-at-point=  | 强制转换光标处的链接                                       |
-| =org-quote-link-refresh=   | 强制刷新光标所在的块                                       |
+| 命令                            | 行为                                                       |
+|---------------------------------+------------------------------------------------------------|
+| =org-quote-link=                | DWIM：块内刷新；单行链接上转换；其它位置报错               |
+| =org-quote-link-at-point=       | 强制转换光标处的链接                                       |
+| =org-quote-link-refresh=        | 强制刷新光标所在的块                                       |
+| =org-quote-link-refresh-buffer= | 刷新当前 buffer 里所有带 transclude header 的块             |
 
 =org-quote-link= 的分派顺序：
 
@@ -163,6 +164,36 @@ handler 返回同类型链接且没有实际改变时会被拒绝，避免无限
 =org-quote-link-refresh= 会读取这一行，保证刷新结果和快照一致。它只是普通的
 Org affiliated keyword（本包自己的约定），不依赖任何外部包。
 
+** 自动刷新模式
+
+=org-quote-link-auto-refresh-mode= 是全局次模式，打开时向 =find-file-hook=
+安装一个函数，关闭时移除。文件打开、major mode 已经确定之后：
+
+1. 只对 =org-mode= buffer 生效；非 Org 文件（例如 =.txt=）即使内容长得像块
+   也不会处理；
+2. 先做一次廉价的文本预检查：在 buffer 里搜索
+   =^[ \t]*#\+HEADER:[ \t]*:transclude[ \t]+[[= ，没有命中就直接返回，不解析
+   整份文件；
+3. 命中后用 =org-element-parse-buffer= 解析，收集所有带
+   =#+HEADER: :transclude [[LINK]]= 行的块（block 类型由
+   =org-quote-link--block-types= 决定，包括手写的 example / src / special
+   等块）；
+4. 从 buffer 末尾向前逐个调用与 =org-quote-link-refresh= 相同的刷新逻辑，
+   这样前面的修改不会移动后面块的位置；
+5. 每个块单独 =condition-case=：链接打不开、目标类型不支持、自我嵌套等情况
+   只让该块保持原样，其它块继续刷新，最后在 echo area 汇总第一条错误。
+
+正文和刚抓取的内容完全相同时不执行替换，所以快照已经最新的文件在访问时仍
+保持未修改状态；确实有变化时才按普通编辑把 buffer 标记为已修改。刷新是同步
+的，没有定时器，也不会监听源文件的后续修改。
+
+=org-quote-link--inhibit-auto-refresh= 在自动刷新期间、以及任何为抓取快照而
+打开链接时动态绑定为 =t=：刷新或转换时要打开其它文件读取快照，这些被间接打开
+的文件不会触发第二层自动刷新，避免嵌套副作用（需要刷新它们时，在那个 buffer
+里执行 =org-quote-link-refresh-buffer= ）。手动批量刷新用
+=org-quote-link-refresh-buffer= ，它只刷新当前 buffer，并在非 Org buffer 里
+报 =user-error= 。
+
 ** 可选的互操作（org-transclusion-blocks）
 
 如果你另外使用 org-transclusion-blocks，它的 =org-transclusion-blocks-add=
@@ -248,6 +279,10 @@ heading 的 property drawer（ =:PROPERTIES:= … =:END:= ）默认被去掉，�
 - *块格式* ： =#+HEADER: :transclude [[LINK]]= + =#+begin_quote= ； =org-element=
   会把 =#+HEADER:= 解析成块的 =:header= 属性，所以 =org-quote-link-refresh=
   不需要任何外部包就能找到链接。
+- *自动刷新* ：全局次模式只在 =find-file-hook= 里工作，先用正则预检查再
+  解析 buffer；刷新逻辑与单块刷新共用，从后往前处理，每个块独立捕获错误，
+  内容没变就不改 buffer。动态变量 =org-quote-link--inhibit-auto-refresh=
+  用来阻止为抓取快照而打开文件时触发嵌套刷新。
 
 * 测试
 
@@ -268,15 +303,19 @@ heading 的 property drawer（ =:PROPERTIES:= … =:END:= ）默认被去掉，�
 =org-store-link= 往返、转义、非 Org 转义开关、缩进、自我嵌套拒绝、行内链接
 拒绝、扩展 handler（改写链接 / 直接提供内容 / =:store= 类型自动解析）、
 刷新（自动生成块 / 手写块 / 非默认块类型 / 显式转义记录）、统一命令的分派
-（链接转换 / 块内刷新 / 无操作时报错）、 =include-headline=
+（链接转换 / 块内刷新 / 无操作时报错）、批量刷新（整个 buffer、narrowing、
+非 Org buffer 报错）、自动刷新模式（打开文件时批量刷新、只处理 transclude
+块、非 Org buffer 跳过、内容未变不标记修改、单块失败不影响其它块、hook 的
+安装与移除、不递归刷新为抓取快照而打开的 buffer（自动刷新与转换两条路径））、
+=include-headline=
 为 =nil= 时的 drawer/planning 排除、follow 只返回 buffer 不切换 buffer 的自定义
 链接、空操作 follow 的拒绝、整个当前文件的自我引用等。
 
 已验证矩阵：
 
-- Emacs 27.1 + Org 9.3：38/38 单测 + 48 条边界测试中 46 条通过、2 条按版本
+- Emacs 27.1 + Org 9.3：48/48 单测 + 51 条边界测试中 49 条通过、2 条按版本
   跳过（需要 Org 9.7+ 或 org-transclusion-blocks 的可选用例）；
-- Emacs 30.2 + Org 10.0pre：38/38 单测 + 48/48 边界测试通过。
+- Emacs 30.2 + Org 10.0pre：本版尚未在该环境复测（上一版全部通过）。
 
 ** 可选的互操作测试
 
@@ -301,7 +340,7 @@ denote 链接、带 description 的链接等）。
 
 - =org-quote-link.el= ：包本体（单文件，只依赖 Org）。
 - =test/org-quote-link-test.el= ：主单测（不依赖第三方包）。
-- =test/org-quote-link-edge-test.el= ：对抗性边界测试（48 条；两个版本敏感的
+- =test/org-quote-link-edge-test.el= ：对抗性边界测试（51 条；两个版本敏感的
   用例会自动跳过）。
 - =test/org-quote-link-interop-test.el= ：可选的 org-transclusion-blocks 互操作
   测试（不参与默认测试，不是依赖）。
@@ -319,4 +358,8 @@ denote 链接、带 description 的链接等）。
   内容时用 handler 提供；
 - handler 直接返回 =:content= 的块无法被外部工具重新抓取，请用
   =org-quote-link-refresh= ；
-- 目前只处理单个链接；批量转换 region / 整份文件是自然的下一步。
+- 自动刷新只在打开文件时运行，不监视源文件的后续修改；刷新是同步的，
+  块很多或目标是远程 / 大文件时打开会变慢；
+- 自动刷新不会递归刷新“为抓取快照而临时打开”的目标文件；需要刷新它们时，
+  在那个 buffer 里执行 =org-quote-link-refresh-buffer= ；
+- 目前转换只处理单个链接；批量转换 region / 整份文件是自然的下一步。

@@ -87,6 +87,16 @@ The link uses the file name relative to DIR."
   (org-quote-link-test--block
    (org-link-make-string (concat "file:" name)) content))
 
+(defmacro org-quote-link-test--with-auto-refresh (&rest body)
+  "Run BODY with `org-quote-link-auto-refresh-mode' enabled.
+The mode is disabled afterwards, even when BODY fails."
+  (declare (indent 0) (debug t))
+  `(unwind-protect
+       (progn
+         (org-quote-link-auto-refresh-mode 1)
+         ,@body)
+     (org-quote-link-auto-refresh-mode -1)))
+
 ;;;; Conversion of org-store-link style links
 
 (ert-deftest org-quote-link-test-file-heading ()
@@ -502,6 +512,154 @@ The link uses the file name relative to DIR."
         (goto-char (point-min))
         (should-error (org-quote-link-refresh) :type 'user-error)))))
 
+;;;; Batch refresh and auto-refresh mode
+
+(ert-deftest org-quote-link-test-refresh-buffer-command ()
+  "`org-quote-link-refresh-buffer' refreshes all blocks in the buffer."
+  (org-quote-link-test--with-dir
+    (org-quote-link-test--write dir "target.org" "* H\nbody\n")
+    (org-quote-link-test--write
+     dir "main.org"
+     (concat "#+HEADER: :transclude [[file:target.org::*H]]\n"
+             "#+begin_quote\nstale quote\n#+end_quote\n\n"
+             "#+HEADER: :transclude [[file:target.org::*H]]\n"
+             "#+begin_example\nstale example\n#+end_example\n"))
+    (let ((buffer (org-quote-link-test--visit dir "main.org")))
+      (with-current-buffer buffer
+        (goto-char (point-max))
+        (should (= 2 (org-quote-link-refresh-buffer)))
+        (should (equal
+                 (buffer-string)
+                 (concat "#+HEADER: :transclude [[file:target.org::*H]]\n"
+                         "#+begin_quote\n,* H\nbody\n#+end_quote\n\n"
+                         "#+HEADER: :transclude [[file:target.org::*H]]\n"
+                         "#+begin_example\n,* H\nbody\n#+end_example\n")))))))
+
+(ert-deftest org-quote-link-test-refresh-buffer-without-blocks ()
+  "`org-quote-link-refresh-buffer' returns 0 and leaves a clean buffer."
+  (org-quote-link-test--with-dir
+    (org-quote-link-test--write dir "main.org" "plain text\n")
+    (let ((buffer (org-quote-link-test--visit dir "main.org")))
+      (with-current-buffer buffer
+        (should (= 0 (org-quote-link-refresh-buffer)))
+        (should-not (buffer-modified-p))))))
+
+(ert-deftest org-quote-link-test-refresh-buffer-refuses-non-org ()
+  "`org-quote-link-refresh-buffer' signals outside Org buffers."
+  (with-temp-buffer
+    (insert "plain text\n")
+    (should-error (org-quote-link-refresh-buffer) :type 'user-error)))
+
+(ert-deftest org-quote-link-test-auto-refresh-on-visit ()
+  "Visiting an Org file refreshes all transclude blocks when the mode is on."
+  (org-quote-link-test--with-dir
+    (org-quote-link-test--write dir "target.org" "* H\nnew body\n")
+    (org-quote-link-test--write
+     dir "main.org"
+     (concat "#+HEADER: :transclude [[file:target.org::*H]]\n"
+             "#+begin_quote\nstale quote\n#+end_quote\n\n"
+             "#+HEADER: :transclude [[file:target.org::*H]]\n"
+             "#+begin_example\nstale example\n#+end_example\n"))
+    (org-quote-link-test--with-auto-refresh
+      (let ((buffer (org-quote-link-test--visit dir "main.org")))
+        (with-current-buffer buffer
+          (should (equal
+                   (buffer-string)
+                   (concat "#+HEADER: :transclude [[file:target.org::*H]]\n"
+                           "#+begin_quote\n,* H\nnew body\n#+end_quote\n\n"
+                           "#+HEADER: :transclude [[file:target.org::*H]]\n"
+                           "#+begin_example\n,* H\nnew body\n#+end_example\n")))
+          (should (buffer-modified-p)))))))
+
+(ert-deftest org-quote-link-test-auto-refresh-mode-off ()
+  "Without the mode, visiting a file leaves its blocks untouched."
+  (org-quote-link-test--with-dir
+    (org-quote-link-test--write dir "target.org" "* H\nbody\n")
+    (let ((content (concat "#+HEADER: :transclude [[file:target.org::*H]]\n"
+                           "#+begin_quote\nstale\n#+end_quote\n")))
+      (org-quote-link-test--write dir "main.org" content)
+      (let ((buffer (org-quote-link-test--visit dir "main.org")))
+        (with-current-buffer buffer
+          (should (equal (buffer-string) content))
+          (should-not (buffer-modified-p)))))))
+
+(ert-deftest org-quote-link-test-auto-refresh-ignores-non-org-buffers ()
+  "The mode does not touch a non-Org file that looks like it has blocks."
+  (org-quote-link-test--with-dir
+    (let ((content (concat "#+HEADER: :transclude [[file:target.org::*H]]\n"
+                           "#+begin_quote\nstale\n#+end_quote\n")))
+      (org-quote-link-test--write dir "main.txt" content)
+      (org-quote-link-test--with-auto-refresh
+        (let ((buffer (org-quote-link-test--visit dir "main.txt")))
+          (with-current-buffer buffer
+            (should (equal (buffer-string) content))))))))
+
+(ert-deftest org-quote-link-test-auto-refresh-only-transclude-blocks ()
+  "The mode leaves blocks without a transclude header alone."
+  (org-quote-link-test--with-dir
+    (org-quote-link-test--write dir "target.org" "* H\nbody\n")
+    (org-quote-link-test--write
+     dir "main.org"
+     (concat "* Section\n"
+             "#+begin_quote\nplain quote\n#+end_quote\n\n"
+             "#+HEADER: :transclude [[file:target.org::*H]]\n"
+             "#+begin_quote\nstale\n#+end_quote\n"))
+    (org-quote-link-test--with-auto-refresh
+      (let ((buffer (org-quote-link-test--visit dir "main.org")))
+        (with-current-buffer buffer
+          (should (string-match-p
+                   (regexp-quote "#+begin_quote\nplain quote\n#+end_quote")
+                   (buffer-string)))
+          (should-not (string-match-p (regexp-quote "stale") (buffer-string)))
+          (should (string-match-p (regexp-quote ",* H\nbody")
+                                  (buffer-string))))))))
+
+(ert-deftest org-quote-link-test-auto-refresh-keeps-clean-buffer-clean ()
+  "Visiting a file whose snapshots are current does not modify the buffer."
+  (org-quote-link-test--with-dir
+    (org-quote-link-test--write dir "target.org" "* H\nbody\n")
+    (let ((content (concat "#+HEADER: :transclude [[file:target.org::*H]]\n"
+                           "#+begin_quote\n,* H\nbody\n#+end_quote\n")))
+      (org-quote-link-test--write dir "main.org" content)
+      (org-quote-link-test--with-auto-refresh
+        (let ((buffer (org-quote-link-test--visit dir "main.org")))
+          (with-current-buffer buffer
+            (should (equal (buffer-string) content))
+            (should-not (buffer-modified-p))))))))
+
+(ert-deftest org-quote-link-test-auto-refresh-failure-keeps-other-blocks ()
+  "A block whose target is missing does not stop the other blocks."
+  (org-quote-link-test--with-dir
+    (org-quote-link-test--write dir "target.org" "* H\nbody\n")
+    (org-quote-link-test--write
+     dir "main.org"
+     (concat "#+HEADER: :transclude [[file:missing.org]]\n"
+             "#+begin_quote\nmissing stale\n#+end_quote\n\n"
+             "#+HEADER: :transclude [[file:target.org::*H]]\n"
+             "#+begin_quote\ngood stale\n#+end_quote\n"))
+    (org-quote-link-test--with-auto-refresh
+      (let ((buffer (org-quote-link-test--visit dir "main.org")))
+        (with-current-buffer buffer
+          (should (string-match-p (regexp-quote "missing stale")
+                                  (buffer-string)))
+          (should-not (string-match-p (regexp-quote "good stale")
+                                      (buffer-string)))
+          (should (string-match-p (regexp-quote ",* H\nbody")
+                                  (buffer-string)))
+          (should (buffer-modified-p)))))))
+
+(ert-deftest org-quote-link-test-auto-refresh-mode-toggles-find-file-hook ()
+  "Enabling the mode installs its `find-file-hook', disabling removes it."
+  (should-not (memq #'org-quote-link--auto-refresh-find-file find-file-hook))
+  (unwind-protect
+      (progn
+        (org-quote-link-auto-refresh-mode 1)
+        (should org-quote-link-auto-refresh-mode)
+        (should (memq #'org-quote-link--auto-refresh-find-file
+                      find-file-hook)))
+    (org-quote-link-auto-refresh-mode -1))
+  (should-not org-quote-link-auto-refresh-mode)
+  (should-not (memq #'org-quote-link--auto-refresh-find-file find-file-hook)))
 
 ;;;; Regression tests (edge cases reported during review)
 

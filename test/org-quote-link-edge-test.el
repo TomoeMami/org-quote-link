@@ -94,6 +94,16 @@ Buffers visiting files under DIR are killed afterwards."
             content
             indent "#+end_quote\n")))
 
+(defmacro org-quote-link-edge--with-auto-refresh (&rest body)
+  "Run BODY with `org-quote-link-auto-refresh-mode' enabled.
+The mode is disabled afterwards, even when BODY fails."
+  (declare (indent 0) (debug t))
+  `(unwind-protect
+       (progn
+         (org-quote-link-auto-refresh-mode 1)
+         ,@body)
+     (org-quote-link-auto-refresh-mode -1)))
+
 (defun org-quote-link-edge--skip (reason)
   "Skip the current test with REASON (or pass on very old Emacs)."
   (if (fboundp 'ert-skip)
@@ -781,6 +791,81 @@ defcustom'd block type instead of the block's own delimiter."
         (should-error (org-quote-link-refresh) :type 'user-error)
         (with-current-buffer buffer
           (should (equal (buffer-string) before)))))))
+
+(ert-deftest org-quote-link-edge-refresh-buffer-widens ()
+  "Batch refresh handles blocks outside the current narrowing."
+  (org-quote-link-edge--with-dir
+    (org-quote-link-edge--write dir "target.org" "* H\nbody\n")
+    (org-quote-link-edge--write
+     dir "main.org"
+     (concat "#+HEADER: :transclude [[file:target.org::*H]]\n"
+             "#+begin_quote\nstale one\n#+end_quote\n\n"
+             "#+HEADER: :transclude [[file:target.org::*H]]\n"
+             "#+begin_quote\nstale two\n#+end_quote\n"))
+    (let ((buffer (org-quote-link-edge--visit dir "main.org")))
+      (with-current-buffer buffer
+        (goto-char (point-min))
+        (search-forward "#+end_quote")
+        (narrow-to-region (point-min) (point))
+        (should (= 2 (org-quote-link-refresh-buffer)))
+        (widen)
+        (should
+         (equal
+          (buffer-string)
+          (concat "#+HEADER: :transclude [[file:target.org::*H]]\n"
+                  "#+begin_quote\n,* H\nbody\n#+end_quote\n\n"
+                  "#+HEADER: :transclude [[file:target.org::*H]]\n"
+                  "#+begin_quote\n,* H\nbody\n#+end_quote\n")))))))
+
+(ert-deftest org-quote-link-edge-auto-refresh-does-not-refresh-link-targets ()
+  "Files opened only to fetch a snapshot are not auto-refreshed themselves."
+  (org-quote-link-edge--with-dir
+    (org-quote-link-edge--write dir "third.org" "* T\nthird body\n")
+    (org-quote-link-edge--write
+     dir "target.org"
+     (concat "* H\ntarget body\n\n"
+             "#+HEADER: :transclude [[file:third.org::*T]]\n"
+             "#+begin_quote\ntarget stale\n#+end_quote\n"))
+    (org-quote-link-edge--write
+     dir "main.org"
+     (concat "#+HEADER: :transclude [[file:target.org::*H]]\n"
+             "#+begin_quote\nmain stale\n#+end_quote\n"))
+    (org-quote-link-edge--with-auto-refresh
+      (let ((main (org-quote-link-edge--visit dir "main.org")))
+        (with-current-buffer main
+          (should-not (string-match-p (regexp-quote "main stale")
+                                      (buffer-string)))
+          (should (string-match-p (regexp-quote ",* H\ntarget body")
+                                  (buffer-string))))
+        (let ((target (get-file-buffer (expand-file-name "target.org" dir))))
+          (should target)
+          (with-current-buffer target
+            (should (string-match-p (regexp-quote "target stale")
+                                    (buffer-string)))))))))
+
+(ert-deftest org-quote-link-edge-conversion-does-not-refresh-target-buffer ()
+  "Resolving a link for a command must not auto-refresh the target file."
+  (org-quote-link-edge--with-dir
+    (org-quote-link-edge--write dir "third.org" "* T\nthird body\n")
+    (org-quote-link-edge--write
+     dir "target.org"
+     (concat "* H\ntarget body\n\n"
+             "#+HEADER: :transclude [[file:third.org::*T]]\n"
+             "#+begin_quote\ntarget stale\n#+end_quote\n"))
+    (org-quote-link-edge--write dir "main.org" "[[file:target.org::*H]]\n")
+    (org-quote-link-edge--with-auto-refresh
+      (let ((main (org-quote-link-edge--visit dir "main.org")))
+        (org-quote-link-edge--at main "[[file:")
+        (with-current-buffer main
+          (org-quote-link-at-point)
+          (should (string-match-p (regexp-quote ",* H\ntarget body")
+                                  (buffer-string))))
+        (let ((target (get-file-buffer (expand-file-name "target.org" dir))))
+          (should target)
+          (with-current-buffer target
+            (should (string-match-p (regexp-quote "target stale")
+                                    (buffer-string)))
+            (should-not (buffer-modified-p))))))))
 
 (ert-deftest org-quote-link-edge-conversion-leaves-point-at-block-start ()
   "Conversion leaves point on the HEADER line (org-transclusion-blocks-add)."

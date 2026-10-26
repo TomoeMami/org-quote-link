@@ -166,6 +166,40 @@ GitHub 直接下载本包，不需要 package archive：
 
 在块里执行 =org-quote-link= 命令等同于刷新。
 
+** 自动刷新模式
+
+开启全局次模式 =org-quote-link-auto-refresh-mode= 后，每次打开一个 Org 文件时，
+包会检查 buffer 里有没有 =#+HEADER: :transclude [[LINK]]= 块；有的话就把
+buffer 里所有这类块的内容重新抓取一遍：
+
+#+begin_src emacs-lisp
+  (org-quote-link-auto-refresh-mode 1)
+#+end_src
+
+放在 =use-package= 配置里：
+
+#+begin_src emacs-lisp
+  (use-package org-quote-link
+    :config
+    (org-quote-link-auto-refresh-mode 1))
+#+end_src
+
+行为说明：
+
+- 只处理 Org buffer，并且只刷新带 =#+HEADER: :transclude [[LINK]]= 行的块；
+  其它 quote-block 不动。
+- 只在打开文件时触发，不监视源文件之后的修改；需要立刻刷新时用
+  =org-quote-link-refresh= （单块）或 =org-quote-link-refresh-buffer=
+  （整个 buffer）。
+- 刷新是同步的。快照本来就和源内容一致时不会把 buffer 标记为已修改；
+  内容确实有更新时 buffer 会变成已修改状态，是否保存由你决定。
+- 某个块的链接打不开时，该块保持原样，其它块照常刷新，并在 echo area
+  汇总错误。
+- 为抓取快照而临时打开的目标文件不会被再次自动刷新，避免刷新过程中的
+  嵌套副作用。
+
+批量刷新也可以手动执行 =M-x org-quote-link-refresh-buffer=。
+
 ** 常用设置
 
 | 变量                                   | 默认值  | 作用                   |
@@ -192,7 +226,7 @@ org-transclusion-blocks 是组件化 transclusion 框架，负责在自己的 he
 | 链接范围 | org-store-link 能生成的类型             | org-transclusion 的 fetcher 能处理的类型       |
 | 内容粒度 | heading、元素、整个文件                 | 还可使用行号、thing-at-point、only-contents 等 |
 | 块类型   | quote（可改为 example 或 verse）        | src、quote、example、special 等，src 走 Babel  |
-| 刷新     | 自带的 org-quote-link-refresh           | org-transclusion-blocks-add 或菜单             |
+| 刷新     | 自带单块刷新、整 buffer 刷新与自动刷新模式 | org-transclusion-blocks-add 或菜单             |
 | 转义     | Org 来源转义，非 Org 原样，可配置       | 由 org-transclusion-blocks 的选项控制          |
 | 元数据   | 不添加，输出纯文本                      | 添加 text properties、overlay 等               |
 | 自引用   | 拒绝 heading、元素、整个当前文件的嵌套  | 有自己的检查逻辑                               |

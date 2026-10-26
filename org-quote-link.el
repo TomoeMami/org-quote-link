@@ -3,7 +3,7 @@
 ;; Copyright (C) 2026 Riko
 
 ;; Author: Riko
-;; Version: 0.4.0
+;; Version: 0.5.0
 ;; Package-Requires: ((emacs "27.1") (org "9.3"))
 ;; Keywords: hypermedia, org, outlines
 ;; SPDX-License-Identifier: GPL-3.0-or-later
@@ -113,13 +113,28 @@
 ;;   内容；如果你另外使用 org-transclusion-blocks，它的 add 命令也可能识别
 ;;   这个格式（可选互操作，不是本包的依赖）。
 ;;
+;; 自动刷新：
+;;
+;;   `org-quote-link-auto-refresh-mode' 是一个全局次模式。开启后每次打开
+;;   （`find-file'）Org 文件时，只要 buffer 里有带
+;;   `#+HEADER: :transclude [[LINK]]' 的块，就会自动刷新这些块的内容：
+;;
+;;       (org-quote-link-auto-refresh-mode 1)
+;;
+;;   刷新是同步的，只处理 Org buffer 里带有此 header 的块；块内容没有变化
+;;   时不会把 buffer 标记为已修改。某个块抓取失败（例如目标文件不存在）
+;;   不会中止其它块。想手动刷新当前 buffer 的所有块，用
+;;   `org-quote-link-refresh-buffer'。
+;;
 ;; 使用方式：
 ;;
 ;;     (use-package org-quote-link
 ;;       :ensure nil
 ;;       :bind (("C-c q" . org-quote-link)
 ;;              :map org-mode-map
-;;              ("C-c Q" . org-quote-link-refresh)))
+;;              ("C-c Q" . org-quote-link-refresh))
+;;       :config
+;;       (org-quote-link-auto-refresh-mode 1))
 ;;
 ;; 或者把本文件放到 `load-path' 里 `(require 'org-quote-link)'。
 ;;
@@ -253,6 +268,13 @@ parameter, or when a handler is added to
           '("quote" "example" "verse" "center" "special" "export"
             "comment" "src"))
   "Element types that are considered block elements when refreshing.")
+
+(defvar org-quote-link--inhibit-auto-refresh nil
+  "Non-nil while a file is opened internally to fetch a snapshot.
+Bind this around link resolution so that files opened only to
+fetch a snapshot are not auto-refreshed as a side effect of
+`org-quote-link-auto-refresh-mode' or of a command that resolves
+another link.")
 
 ;;;; Link at point
 
@@ -430,6 +452,9 @@ files in Emacs instead of external applications, and to never ask
         (org-file-apps '((t . emacs)))
         (inhibit-message t)
         (message-log-max nil)
+        ;; The target buffer may be a new file: do not let the auto-refresh
+        ;; hook treat this internal visit as a user-visible file visit.
+        (org-quote-link--inhibit-auto-refresh t)
         (origin (current-buffer))
         (origin-point (point))
         result target)
@@ -873,21 +898,14 @@ The value is t, nil, or `:default' when the block does not say."
             (forward-line 0)
             (cons beg (point))))))))
 
-;;;###autoload
-(defun org-quote-link-refresh ()
-  "Re-fetch the content of the org-quote-link block at point.
-
-The block is recognized by its `#+HEADER: :transclude [[LINK]]'
-line, so blocks created by `org-quote-link-at-point' as well as
-equivalent blocks written by hand can be refreshed.  The content
-is replaced with a fresh, escaped snapshot of the link target.
-
-See also `org-quote-link' for a single command that picks the
-right action based on the position of point."
-  (interactive)
-  (let* ((block (or (org-quote-link--block-at-point)
-                    (user-error "Point is not in a block")))
-         (link-string (or (org-quote-link--block-link-string block)
+(defun org-quote-link--refresh-block (block)
+  "Refresh BLOCK and return its new content.
+BLOCK must carry a `#+HEADER: :transclude [[LINK]]' line.  Signal
+a `user-error' when the link cannot be resolved or when the target
+contains BLOCK itself.  Replace the content only when the fetched
+text differs from what is already there, so refreshing an
+up-to-date block does not mark the buffer as modified."
+  (let* ((link-string (or (org-quote-link--block-link-string block)
                           (user-error
                            "This block has no `#+HEADER: :transclude [[LINK]]' line")))
          (link (or (org-quote-link--parse-link link-string)
@@ -900,13 +918,104 @@ right action based on the position of point."
        "The link target contains this block; refusing to embed it into itself"))
     (let ((content (org-quote-link--escaped-content
                     target (org-quote-link--block-escape-setting block))))
-      (atomic-change-group
-        (save-excursion
-          (goto-char (car bounds))
-          (delete-region (car bounds) (cdr bounds))
-          (insert content)))
-      (message "Refreshed org-quote-link block")
+      (unless (equal content
+                     (buffer-substring-no-properties (car bounds) (cdr bounds)))
+        (atomic-change-group
+          (save-excursion
+            (goto-char (car bounds))
+            (delete-region (car bounds) (cdr bounds))
+            (insert content))))
       content)))
+
+;;;###autoload
+(defun org-quote-link-refresh ()
+  "Re-fetch the content of the org-quote-link block at point.
+
+The block is recognized by its `#+HEADER: :transclude [[LINK]]'
+line, so blocks created by `org-quote-link-at-point' as well as
+equivalent blocks written by hand can be refreshed.  The content
+is replaced with a fresh, escaped snapshot of the link target.
+
+See also `org-quote-link' for a single command that picks the
+right action based on the position of point, and
+`org-quote-link-refresh-buffer' to refresh every block in the
+current buffer at once."
+  (interactive)
+  (let* ((block (or (org-quote-link--block-at-point)
+                    (user-error "Point is not in a block")))
+         (content (org-quote-link--refresh-block block)))
+    (message "Refreshed org-quote-link block")
+    content))
+
+(defun org-quote-link--buffer-has-transclude-p ()
+  "Return non-nil when the current buffer may contain a transclude block.
+This is a cheap pre-check before the buffer is parsed: it only
+looks for a `#+HEADER: :transclude [[LINK]]' line anywhere in the
+buffer."
+  (org-with-wide-buffer
+   (goto-char (point-min))
+   (let ((case-fold-search t))
+     (re-search-forward
+      "^[ \t]*#\\+HEADER:[ \t]*:transclude[ \t]+\\[\\[" nil t))))
+
+(defun org-quote-link--buffer-blocks ()
+  "Return all org-quote-link blocks in the current buffer, in buffer order.
+A block belongs to this package when it has a
+`#+HEADER: :transclude [[LINK]]' line.  Return nil when there is
+no such block."
+  (when (org-quote-link--buffer-has-transclude-p)
+    (org-with-wide-buffer
+     (org-element-map (org-element-parse-buffer)
+         org-quote-link--block-types
+       (lambda (block)
+         (when (org-quote-link--block-link-string block)
+           block))))))
+
+;;;###autoload
+(defun org-quote-link-refresh-buffer ()
+  "Refresh every org-quote-link block in the current buffer.
+
+Each block is refreshed as if `org-quote-link-refresh' had been
+called inside it.  Blocks whose target cannot be fetched (missing
+file, unsupported link type, self-reference, ...) are left
+unchanged and do not prevent the other blocks from being
+refreshed; a summary is echoed at the end.
+
+Return the number of blocks that were refreshed successfully.
+Unlike the automatic refresh done by
+`org-quote-link-auto-refresh-mode', this command signals a
+`user-error' in a non-Org buffer."
+  (interactive)
+  (unless (derived-mode-p 'org-mode)
+    (user-error "Point is not in an Org buffer"))
+  (let ((blocks (org-quote-link--buffer-blocks))
+        (refreshed 0)
+        (failed 0)
+        failure)
+    (org-with-wide-buffer
+     ;; Refresh from the end of the buffer so that the positions of the
+     ;; blocks still to be processed are not shifted by the edits.
+     (dolist (block (reverse blocks))
+       (condition-case err
+           (progn
+             (org-quote-link--refresh-block block)
+             (setq refreshed (1+ refreshed)))
+         (error
+          (setq failed (1+ failed))
+          (unless failure
+            (setq failure
+                  (format "line %d: %s"
+                          (line-number-at-pos (org-element-property :begin block))
+                          (error-message-string err)))))))
+     (cond
+      ((> failed 0)
+       (message "Refreshed %d org-quote-link block(s); %d failed (%s)"
+                refreshed failed failure))
+      ((called-interactively-p 'interactive)
+       (if (> refreshed 0)
+           (message "Refreshed %d org-quote-link block(s)" refreshed)
+         (message "No org-quote-link blocks in this buffer")))))
+    refreshed))
 
 ;;;###autoload
 (defun org-quote-link ()
@@ -936,6 +1045,53 @@ specific action regardless of context."
      (t
       (user-error
        "Point is neither on an Org link nor in an org-quote-link block")))))
+
+;;;; Auto-refresh mode
+
+;; Defined below by `define-minor-mode'; declared here so that the
+;; following hook function byte-compiles without a free-variable warning.
+(defvar org-quote-link-auto-refresh-mode)
+
+(defun org-quote-link--auto-refresh-find-file ()
+  "Refresh all org-quote-link blocks in the buffer just visited.
+This is the `find-file-hook' function installed by
+`org-quote-link-auto-refresh-mode'.  Nothing happens outside Org
+buffers, in buffers without transclude blocks, or when a file is
+being opened internally to fetch a snapshot."
+  (when (and org-quote-link-auto-refresh-mode
+             (derived-mode-p 'org-mode)
+             (not org-quote-link--inhibit-auto-refresh))
+    (let ((org-quote-link--inhibit-auto-refresh t))
+      (condition-case err
+          (org-quote-link-refresh-buffer)
+        (error
+         (message "org-quote-link auto-refresh failed: %s"
+                  (error-message-string err)))))))
+
+;;;###autoload
+(define-minor-mode org-quote-link-auto-refresh-mode
+  "Automatically refresh org-quote-link blocks when visiting Org files.
+
+When this global minor mode is enabled, `find-file-hook' checks
+every visited Org buffer.  If the buffer contains blocks with a
+`#+HEADER: :transclude [[LINK]]' line, their contents are fetched
+again with the same rules as `org-quote-link-refresh'.  A block
+whose target cannot be fetched is left unchanged and is reported
+without preventing the other blocks from being refreshed.
+
+The refresh runs synchronously.  A buffer is marked as modified
+only when at least one block's content actually changed, so merely
+visiting an up-to-date file leaves it unmodified.  Buffers opened
+indirectly as link targets are not auto-refreshed themselves.
+
+Use `org-quote-link-refresh-buffer' to refresh all blocks in the
+current buffer on demand."
+  :global t
+  :group 'org-quote-link
+  :lighter nil
+  (if org-quote-link-auto-refresh-mode
+      (add-hook 'find-file-hook #'org-quote-link--auto-refresh-find-file)
+    (remove-hook 'find-file-hook #'org-quote-link--auto-refresh-find-file)))
 
 (provide 'org-quote-link)
 ;;; org-quote-link.el ends here

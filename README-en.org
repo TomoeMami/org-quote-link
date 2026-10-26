@@ -175,6 +175,47 @@ the =#+HEADER: :transclude [[LINK]]= line to find the link.
 
 Running =org-quote-link= inside the block does the same thing.
 
+** Auto-refresh mode
+
+Enable the global minor mode =org-quote-link-auto-refresh-mode= and every
+time you open an Org file, the package checks whether the buffer contains
+blocks with a =#+HEADER: :transclude [[LINK]]= line. If it does, the contents
+of all such blocks are fetched again:
+
+#+begin_src emacs-lisp
+  (org-quote-link-auto-refresh-mode 1)
+#+end_src
+
+With =use-package=:
+
+#+begin_src emacs-lisp
+  (use-package org-quote-link
+    :config
+    (org-quote-link-auto-refresh-mode 1))
+#+end_src
+
+Details:
+
+- Only Org buffers are considered, and only blocks with a
+  =#+HEADER: :transclude [[LINK]]= line are refreshed; other quote blocks are
+  left alone.
+- The refresh runs when a file is opened. Changes made to the source file
+  afterwards are not watched; use =org-quote-link-refresh= for one block or
+  =org-quote-link-refresh-buffer= for the whole buffer when you need an
+  immediate refresh.
+- Refresh is synchronous. If a block is already up to date it is not
+  rewritten, so visiting an up-to-date file leaves the buffer unmodified;
+  when content does change, the buffer becomes modified and you decide
+  whether to save it.
+- If one block cannot be refreshed (for example its target file is missing),
+  that block is left as it is while the other blocks are still refreshed, and
+  a summary is echoed.
+- Files opened only to fetch a snapshot are not auto-refreshed themselves, so
+  the refresh does not nest.
+
+You can also refresh every block in the current buffer manually with
+=M-x org-quote-link-refresh-buffer=.
+
 ** Common settings
 
 | Variable                                 | Default | Purpose                        |
@@ -204,7 +245,7 @@ syntax.
 | Link types        | Types produced by org-store-link          | Everything the org-transclusion fetchers handle |
 | Content granularity | Heading, element, whole file            | Also lines, thing-at-point, only-contents, etc. |
 | Block types       | quote (configurable to example or verse)  | src, quote, example, special, …; src uses Babel |
-| Refresh           | Built-in org-quote-link-refresh           | org-transclusion-blocks-add or its menu         |
+| Refresh           | Built-in single-block, whole-buffer, and auto refresh | org-transclusion-blocks-add or its menu         |
 | Escaping          | Org sources escaped, non-Org verbatim     | Controlled by org-transclusion-blocks options   |
 | Metadata          | None; plain text output                   | Text properties, overlays, etc.                 |
 | Self-reference    | Refuses heading/element/whole-file nesting | Has its own checks                             |
