@@ -166,6 +166,26 @@ GitHub 直接下载本包，不需要 package archive：
 
 在块里执行 =org-quote-link= 命令等同于刷新。
 
+** 跟随源链接（=C-c C-o=）
+
+块的 =#+HEADER: :transclude [[LINK]]= 行是 quote-block 的 affiliated
+keyword。Org 会把这种行并进下面的块，行里的链接因此不算独立的 link 元素，
+默认在 header 行按 =C-c C-o= 只会得到 =No links=。本包在加载时把
+=org-quote-link--follow-link-at-point= 加入 =org-open-at-point-functions=，
+于是：
+
+- 光标停在 header 行时，=C-c C-o= 会跟随源链接；Denote、 =file:= 、 =id:=
+  等类型的 follow 函数与普通链接一致， =::= 搜索选项也会保留。
+- =M-x org-quote-link-open-source= 在 header 行或块内任意位置都能打开该块
+  对应的源链接，可以单独绑定按键。
+
+如果不想让 =C-c C-o= 在这里接管，移除这个 hook 即可：
+
+#+begin_src emacs-lisp
+  (remove-hook 'org-open-at-point-functions
+               #'org-quote-link--follow-link-at-point)
+#+end_src
+
 ** 自动刷新模式
 
 开启全局次模式 =org-quote-link-auto-refresh-mode= 后，每次打开一个 Org 文件时，

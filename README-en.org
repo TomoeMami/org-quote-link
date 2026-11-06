@@ -175,6 +175,28 @@ the =#+HEADER: :transclude [[LINK]]= line to find the link.
 
 Running =org-quote-link= inside the block does the same thing.
 
+** Follow the source link (=C-c C-o=)
+
+The =#+HEADER: :transclude [[LINK]]= line is an affiliated keyword of the
+quote block. Org folds such lines into the block, so the link in it is not a
+link element of its own and pressing =C-c C-o= on the header line would
+normally only report =No links=. When the package is loaded, it adds
+=org-quote-link--follow-link-at-point= to =org-open-at-point-functions=, so:
+
+- With point on the header line, =C-c C-o= follows the source link; follow
+  functions of Denote, =file:=, =id:= and other types behave exactly as for a
+  normal link, and any =::= search option is kept.
+- =M-x org-quote-link-open-source= opens the block's source link from the
+  header line or from anywhere inside the block, so it can also be bound to a
+  key of its own.
+
+To opt out, remove the hook:
+
+#+begin_src emacs-lisp
+  (remove-hook 'org-open-at-point-functions
+               #'org-quote-link--follow-link-at-point)
+#+end_src
+
 ** Auto-refresh mode
 
 Enable the global minor mode =org-quote-link-auto-refresh-mode= and every

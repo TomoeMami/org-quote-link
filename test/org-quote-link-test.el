@@ -910,5 +910,84 @@ The mode is disabled afterwards, even when BODY fails."
           (should-error (org-quote-link) :type 'user-error))
       (kill-buffer buffer))))
 
+;;;; Following the source link
+
+(ert-deftest org-quote-link-test-follow-link-hook-is-installed ()
+  "The `org-open-at-point' hook is installed when the package loads."
+  (should (memq #'org-quote-link--follow-link-at-point
+                org-open-at-point-functions)))
+
+(ert-deftest org-quote-link-test-follow-link-on-header-line ()
+  "`org-open-at-point' on the header line follows the :transclude link."
+  (org-quote-link-test--with-dir
+    (org-quote-link-test--write dir "target.org" "* Target\nbody\n")
+    (org-quote-link-test--write
+     dir "main.org"
+     (concat "#+HEADER: :transclude [[file:target.org::*Target][Target]]\n"
+             "#+begin_quote\n"
+             ",* Target\n"
+             "body\n"
+             "#+end_quote\n"))
+    (let ((buffer (org-quote-link-test--visit dir "main.org")))
+      (with-current-buffer buffer
+        (goto-char (point-min))
+        (search-forward "[[file:")
+        (goto-char (match-beginning 0))
+        ;; Org parses the whole header line as the quote block, so the link
+        ;; is not a link element of its own; the package follows it anyway.
+        (should (eq (org-element-type (org-element-context)) 'quote-block))
+        (org-open-at-point)
+        (should (equal (buffer-name) "target.org"))
+        (should (looking-at-p "\\* Target"))))))
+
+(ert-deftest org-quote-link-test-open-source-from-block ()
+  "`org-quote-link-open-source' opens the link from inside the block."
+  (org-quote-link-test--with-dir
+    (org-quote-link-test--write dir "target.org" "* Target\nbody\n")
+    (org-quote-link-test--write
+     dir "main.org"
+     (concat "#+HEADER: :transclude [[file:target.org::*Target][Target]]\n"
+             "#+begin_quote\n"
+             ",* Target\n"
+             "body\n"
+             "#+end_quote\n"))
+    (let ((buffer (org-quote-link-test--visit dir "main.org")))
+      (with-current-buffer buffer
+        (goto-char (point-min))
+        (search-forward ",* Target")
+        (goto-char (match-beginning 0))
+        (org-quote-link-open-source)
+        (should (equal (buffer-name) "target.org"))
+        (should (looking-at-p "\\* Target"))))))
+
+(ert-deftest org-quote-link-test-follow-link-only-on-header ()
+  "The follow function ignores positions outside a :transclude header line."
+  (with-temp-buffer
+    (insert "* Heading\n"
+            "plain [[file:/tmp/not-opened.org][link]]\n"
+            "#+HEADER: :transclude [[file:/tmp/also-not-opened.org][x]]\n"
+            "#+begin_quote\n"
+            ",* body\n"
+            "#+end_quote\n")
+    (delay-mode-hooks (org-mode))
+    (goto-char (point-min))
+    (search-forward "plain")
+    (should-not (org-quote-link--follow-link-at-point))
+    (goto-char (point-min))
+    (search-forward "#+HEADER")
+    (should (equal (org-quote-link--header-link-at-point)
+                   "[[file:/tmp/also-not-opened.org][x]]"))
+    (goto-char (point-min))
+    (search-forward ",* body")
+    (should-not (org-quote-link--follow-link-at-point))))
+
+(ert-deftest org-quote-link-test-open-source-refuses-elsewhere ()
+  "`org-quote-link-open-source' outside a block gives a clear error."
+  (with-temp-buffer
+    (insert "plain text\n")
+    (delay-mode-hooks (org-mode))
+    (goto-char (point-min))
+    (should-error (org-quote-link-open-source) :type 'user-error)))
+
 (provide 'org-quote-link-test)
 ;;; org-quote-link-test.el ends here

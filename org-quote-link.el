@@ -3,7 +3,7 @@
 ;; Copyright (C) 2026 Riko
 
 ;; Author: Riko
-;; Version: 0.5.0
+;; Version: 0.6.0
 ;; Package-Requires: ((emacs "27.1") (org "9.3"))
 ;; Keywords: hypermedia, org, outlines
 ;; SPDX-License-Identifier: GPL-3.0-or-later
@@ -125,6 +125,21 @@
 ;;   时不会把 buffer 标记为已修改。某个块抓取失败（例如目标文件不存在）
 ;;   不会中止其它块。想手动刷新当前 buffer 的所有块，用
 ;;   `org-quote-link-refresh-buffer'。
+;;
+;; 跟随源链接：
+;;
+;;   块的 `#+HEADER: :transclude [[LINK]]' 行是 quote-block 的 affiliated
+;;   keyword。Org 把这类行并进下面的块，不会把行里的链接当成 link 元素，
+;;   所以 `org-open-at-point' 默认无法跟随它（只会提示 “No links”）。本包
+;;   把 `org-quote-link--follow-link-at-point' 加进
+;;   `org-open-at-point-functions'，于是光标停在 header 行时：
+;;
+;;     - `C-c C-o'（`org-open-at-point'）会跟随该链接；
+;;     - `M-x org-quote-link-open-source' 在 header 行或块内任意位置都能
+;;       打开块对应的源链接。
+;;
+;;   链接按普通 Org 链接的方式打开：使用链接类型自己的 follow 函数，
+;;   并保留 `::' 搜索选项。
 ;;
 ;; 使用方式：
 ;;
@@ -1017,6 +1032,73 @@ Unlike the automatic refresh done by
          (message "No org-quote-link blocks in this buffer")))))
     refreshed))
 
+;;;; Following the source link
+
+(defconst org-quote-link--header-link-re
+  "^[ \t]*#\\+HEADER:[ \t]*:transclude[ \t]+\\(\\[\\[.*?\\]\\]\\)"
+  "Regexp matching the `:transclude' link on a block's header line.
+The first group holds the bracket form of the link.")
+
+(defun org-quote-link--header-link-at-point ()
+  "Return the `:transclude' link string on the current line, or nil.
+The line must carry this package's
+`#+HEADER: :transclude [[LINK]]' convention.  The value is the
+bracket form of LINK, as a string."
+  (when (derived-mode-p 'org-mode)
+    (save-excursion
+      (goto-char (line-beginning-position))
+      (let ((case-fold-search t))
+        (when (looking-at org-quote-link--header-link-re)
+          (match-string-no-properties 1))))))
+
+(defun org-quote-link--open-link-string (link-string)
+  "Open LINK-STRING as a normal Org link and return non-nil.
+LINK-STRING must be the bracket form of an Org link.  The link is
+opened with `org-link-open', so the follow function registered for
+its type and any `::SEARCH' option are used exactly as when a link
+is followed from an Org buffer."
+  (let ((link (or (org-quote-link--parse-link link-string)
+                  (user-error "Cannot parse link %s" link-string))))
+    (org-link-open link)
+    t))
+
+;;;###autoload
+(defun org-quote-link-open-source ()
+  "Open the source link of the org-quote-link block at point.
+
+The link is read from the block's `#+HEADER: :transclude [[LINK]]'
+line, so the command works on that line and anywhere inside the
+block.  This is needed because Org treats a link inside an
+affiliated keyword such as `#+HEADER:' as part of the block, not
+as a link of its own; `org-open-at-point' therefore cannot follow
+it by default.
+
+The link is opened the same way as a normal Org link: the follow
+function registered for its type and any `::SEARCH' option are
+honored."
+  (interactive)
+  (let ((link-string
+         (or (org-quote-link--header-link-at-point)
+             (let ((block (org-quote-link--block-at-point)))
+               (cond
+                ((null block)
+                 (user-error "Point is not in an org-quote-link block"))
+                ((org-quote-link--block-link-string block))
+                (t
+                 (user-error
+                  "This block has no `#+HEADER: :transclude [[LINK]]' line")))))))
+    (org-quote-link--open-link-string link-string)))
+
+(defun org-quote-link--follow-link-at-point ()
+  "Follow the `:transclude' link on the current header line.
+This function is added to `org-open-at-point-functions': it
+returns non-nil after following the link when point is on a
+`#+HEADER: :transclude [[LINK]]' line and nil everywhere else, so
+it does not affect other positions or buffers."
+  (let ((link-string (org-quote-link--header-link-at-point)))
+    (when link-string
+      (org-quote-link--open-link-string link-string))))
+
 ;;;###autoload
 (defun org-quote-link ()
   "Quote the Org link at point, or refresh the quote block at point.
@@ -1092,6 +1174,12 @@ current buffer on demand."
   (if org-quote-link-auto-refresh-mode
       (add-hook 'find-file-hook #'org-quote-link--auto-refresh-find-file)
     (remove-hook 'find-file-hook #'org-quote-link--auto-refresh-find-file)))
+
+;; The `:transclude' header line is an affiliated keyword of its block, so
+;; Org's own `org-open-at-point' cannot find the link in it.  Follow the
+;; link from the header line instead of reporting "No links".
+(add-hook 'org-open-at-point-functions
+          #'org-quote-link--follow-link-at-point)
 
 (provide 'org-quote-link)
 ;;; org-quote-link.el ends here

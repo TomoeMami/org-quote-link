@@ -13,6 +13,7 @@
 | =org-quote-link-at-point=       | 强制转换光标处的链接                                       |
 | =org-quote-link-refresh=        | 强制刷新光标所在的块                                       |
 | =org-quote-link-refresh-buffer= | 刷新当前 buffer 里所有带 transclude header 的块             |
+| =org-quote-link-open-source=    | 打开光标所在块（或 header 行）对应的源链接                 |
 
 =org-quote-link= 的分派顺序：
 
@@ -22,6 +23,25 @@
 
 因为块优先，所以块内部即使有链接也是刷新；需要转换块内链接时，直接调用
 =org-quote-link-at-point= 。
+
+** 跟随源链接
+
+块的 =#+HEADER: :transclude [[LINK]]= 行是 quote-block 的 affiliated
+keyword： =org-element= 把这类行并进下面的块，整行（包括链接）解析出来的元素
+是块本身，而不是 =keyword= 或 =link= 。因此 Org 自带的 =org-open-at-point=
+无法跟随这个链接：它会退回到“列出当前 entry 里所有链接”的分支，而该分支只
+接受 =link= / =comment= / =comment-block= / =node-property= / =keyword= 类型，
+于是最后只提示 =No links= （不在 headline 里时是 =No link found= ）。
+
+本包在加载时把 =org-quote-link--follow-link-at-point= 加入
+=org-open-at-point-functions= ：光标停在 header 行时，该函数从行内正则取出
+=[[LINK]]= ，用 =org-link-open= 打开并返回 =t= 终止 =org-open-at-point= 。
+因此 =C-c C-o= 以及任何走 =org-open-at-point= 的入口（例如
+=org-open-at-mouse= ）都能跟随源链接；不含 =:transclude= 的行不受影响。
+显式命令 =org-quote-link-open-source= 则对 header 行和块内任意位置都适用。
+
+链接仍然按普通 Org 链接的方式打开：follow 函数、 =::= 搜索选项都由
+=org-link-open= 处理，和直接点普通链接一致。
 
 * 支持的链接类型
 
@@ -279,6 +299,12 @@ heading 的 property drawer（ =:PROPERTIES:= … =:END:= ）默认被去掉，�
 - *块格式* ： =#+HEADER: :transclude [[LINK]]= + =#+begin_quote= ； =org-element=
   会把 =#+HEADER:= 解析成块的 =:header= 属性，所以 =org-quote-link-refresh=
   不需要任何外部包就能找到链接。
+- *跟随链接* ： =#+HEADER:= 行属于块，Org 不把行内的链接当作 link 元素。
+  本包把 =org-quote-link--follow-link-at-point= 挂到
+  =org-open-at-point-functions= ，从 header 行正则取出链接后用
+  =org-link-open= 打开，走的仍是普通链接的 follow 路径；该函数只在
+  =:transclude= header 行返回 =t= ，其它位置返回 =nil= ，不影响 Org 原有
+  行为。
 - *自动刷新* ：全局次模式只在 =find-file-hook= 里工作，先用正则预检查再
   解析 buffer；刷新逻辑与单块刷新共用，从后往前处理，每个块独立捕获错误，
   内容没变就不改 buffer。动态变量 =org-quote-link--inhibit-auto-refresh=
@@ -362,4 +388,8 @@ denote 链接、带 description 的链接等）。
   块很多或目标是远程 / 大文件时打开会变慢；
 - 自动刷新不会递归刷新“为抓取快照而临时打开”的目标文件；需要刷新它们时，
   在那个 buffer 里执行 =org-quote-link-refresh-buffer= ；
+- header 行里的链接不是 Org 的 link 元素，只能用 =C-c C-o= 这类走
+  =org-open-at-point= 的入口跟随（或 =org-quote-link-open-source= ）；
+  真正的鼠标点击依赖 link 的 =mouse-face= / =keymap= 文本属性，该行没有
+  这些属性，所以 =mouse-1= 不会触发跟随；
 - 目前转换只处理单个链接；批量转换 region / 整份文件是自然的下一步。
