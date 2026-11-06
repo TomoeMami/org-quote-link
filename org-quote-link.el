@@ -135,6 +135,8 @@
 ;;   `org-open-at-point-functions'，于是光标停在 header 行时：
 ;;
 ;;     - `C-c C-o'（`org-open-at-point'）会跟随该链接；
+;;     - 鼠标点击链接文字也会跟随：Org 的 font-lock 会给这段文字加上 link
+;;       的 mouse 属性，鼠标点击最终同样走 `org-open-at-point'；
 ;;     - `M-x org-quote-link-open-source' 在 header 行或块内任意位置都能
 ;;       打开块对应的源链接。
 ;;

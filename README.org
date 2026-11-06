@@ -166,7 +166,7 @@ GitHub 直接下载本包，不需要 package archive：
 
 在块里执行 =org-quote-link= 命令等同于刷新。
 
-** 跟随源链接（=C-c C-o=）
+** 跟随源链接（=C-c C-o= 或鼠标）
 
 块的 =#+HEADER: :transclude [[LINK]]= 行是 quote-block 的 affiliated
 keyword。Org 会把这种行并进下面的块，行里的链接因此不算独立的 link 元素，
@@ -176,6 +176,9 @@ keyword。Org 会把这种行并进下面的块，行里的链接因此不算独
 
 - 光标停在 header 行时，=C-c C-o= 会跟随源链接；Denote、 =file:= 、 =id:=
   等类型的 follow 函数与普通链接一致， =::= 搜索选项也会保留。
+- 鼠标点击 header 行里的链接文字同样会跟随。Org 的 font-lock 会给链接文字加
+  上 =mouse-face= 、 =keymap= （=org-mouse-map= ）和 =follow-link= 属性，
+  =mouse-1= 点击会走 =org-open-at-mouse= ，最终仍由上面的 hook 处理。
 - =M-x org-quote-link-open-source= 在 header 行或块内任意位置都能打开该块
   对应的源链接，可以单独绑定按键。
 

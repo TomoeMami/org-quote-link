@@ -175,7 +175,7 @@ the =#+HEADER: :transclude [[LINK]]= line to find the link.
 
 Running =org-quote-link= inside the block does the same thing.
 
-** Follow the source link (=C-c C-o=)
+** Follow the source link (=C-c C-o= or the mouse)
 
 The =#+HEADER: :transclude [[LINK]]= line is an affiliated keyword of the
 quote block. Org folds such lines into the block, so the link in it is not a
@@ -186,6 +186,10 @@ normally only report =No links=. When the package is loaded, it adds
 - With point on the header line, =C-c C-o= follows the source link; follow
   functions of Denote, =file:=, =id:= and other types behave exactly as for a
   normal link, and any =::= search option is kept.
+- Clicking the link text with the mouse works too. Org's font-lock puts the
+  usual =mouse-face=, =keymap= (=org-mouse-map=) and =follow-link= properties
+  on the link text, so a =mouse-1= click goes through
+  =org-open-at-mouse= and ends up in the same hook.
 - =M-x org-quote-link-open-source= opens the block's source link from the
   header line or from anywhere inside the block, so it can also be bound to a
   key of its own.

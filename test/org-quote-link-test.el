@@ -940,6 +940,42 @@ The mode is disabled afterwards, even when BODY fails."
         (should (equal (buffer-name) "target.org"))
         (should (looking-at-p "\\* Target"))))))
 
+(ert-deftest org-quote-link-test-follow-link-with-mouse ()
+  "A mouse click on the header link opens the source link.
+Org's font-lock puts the usual link mouse properties on the link
+text even on an affiliated keyword line, so only
+`org-open-at-point' had to learn to follow it."
+  (org-quote-link-test--with-dir
+    (org-quote-link-test--write dir "target.org" "* Target\nbody\n")
+    (org-quote-link-test--write
+     dir "main.org"
+     (concat "#+HEADER: :transclude [[file:target.org::*Target][Target]]\n"
+             "#+begin_quote\n"
+             ",* Target\n"
+             "body\n"
+             "#+end_quote\n"))
+    (let ((buffer (org-quote-link-test--visit dir "main.org"))
+          (window (selected-window))
+          (old-buffer (window-buffer (selected-window))))
+      (unwind-protect
+          (with-current-buffer buffer
+            (font-lock-ensure)
+            (goto-char (point-min))
+            (search-forward "[[file:")
+            (goto-char (match-beginning 0))
+            (let* ((pos (point))
+                   (keymap (get-text-property pos 'keymap))
+                   (posn (list window pos '(0 . 0) 0)))
+              (set-window-buffer window (current-buffer))
+              (should (eq (get-text-property pos 'mouse-face) 'highlight))
+              (should (eq (lookup-key keymap [mouse-2]) #'org-open-at-mouse))
+              (should (mouse-on-link-p posn))
+              ;; Same path as a mouse-1 click on a normal Org link.
+              (org-open-at-mouse (list 'mouse-2 posn))
+              (should (equal (buffer-name) "target.org"))
+              (should (looking-at-p "\\* Target"))))
+        (set-window-buffer window old-buffer)))))
+
 (ert-deftest org-quote-link-test-open-source-from-block ()
   "`org-quote-link-open-source' opens the link from inside the block."
   (org-quote-link-test--with-dir

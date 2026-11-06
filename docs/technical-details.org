@@ -36,9 +36,16 @@ keyword： =org-element= 把这类行并进下面的块，整行（包括链接�
 本包在加载时把 =org-quote-link--follow-link-at-point= 加入
 =org-open-at-point-functions= ：光标停在 header 行时，该函数从行内正则取出
 =[[LINK]]= ，用 =org-link-open= 打开并返回 =t= 终止 =org-open-at-point= 。
-因此 =C-c C-o= 以及任何走 =org-open-at-point= 的入口（例如
-=org-open-at-mouse= ）都能跟随源链接；不含 =:transclude= 的行不受影响。
-显式命令 =org-quote-link-open-source= 则对 header 行和块内任意位置都适用。
+因此 =C-c C-o= 以及任何走 =org-open-at-point= 的入口都能跟随源链接；不含
+=:transclude= 的行不受影响。显式命令 =org-quote-link-open-source= 则对
+header 行和块内任意位置都适用。
+
+鼠标点击同样可用，原因是 Org 的 font-lock 不是按元素、而是按正则给链接文字
+加属性的：即使这一行在元素层面是块， =[[LINK]]= 这段文字仍然会带上
+=mouse-face= 、 =keymap= （ =org-mouse-map= ，其中 =mouse-2= 绑定
+=org-open-at-mouse= ）和 =follow-link= 属性。于是 =mouse-1= 点击会被翻译成
+=mouse-2= ，运行 =org-open-at-mouse= ，它设置 point 后调用
+=org-open-at-point= ，再被上面的 hook 接管——和点普通 Org 链接走的是同一条路。
 
 链接仍然按普通 Org 链接的方式打开：follow 函数、 =::= 搜索选项都由
 =org-link-open= 处理，和直接点普通链接一致。
@@ -388,8 +395,8 @@ denote 链接、带 description 的链接等）。
   块很多或目标是远程 / 大文件时打开会变慢；
 - 自动刷新不会递归刷新“为抓取快照而临时打开”的目标文件；需要刷新它们时，
   在那个 buffer 里执行 =org-quote-link-refresh-buffer= ；
-- header 行里的链接不是 Org 的 link 元素，只能用 =C-c C-o= 这类走
-  =org-open-at-point= 的入口跟随（或 =org-quote-link-open-source= ）；
-  真正的鼠标点击依赖 link 的 =mouse-face= / =keymap= 文本属性，该行没有
-  这些属性，所以 =mouse-1= 不会触发跟随；
+- 鼠标点击 header 行里的链接依赖 Org font-lock 给链接文字加的
+  =mouse-face= / =keymap= / =follow-link= 属性；关闭 font-lock 时这些属性
+  不存在，鼠标点击不会跟随（普通链接同理），此时用 =C-c C-o= 或
+  =org-quote-link-open-source= ；
 - 目前转换只处理单个链接；批量转换 region / 整份文件是自然的下一步。
